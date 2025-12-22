@@ -44,7 +44,8 @@ impl Default for CloudCentroid {
 }
 
 const PHI: f32 = 1.618033988749;
-const PINCH_STRENGTH: f32 = 500.0;
+const PINCH_STRENGTH: f32 = 10.0;
+const DAMPING: f32 = 5.0;
 
 fn ideal_spiral_pos(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
@@ -110,9 +111,11 @@ pub fn update_galaxy_physics(
                 let angle = (particle.original_radius.ln() / 0.3) + arm_offset + galaxy_angle;
                 let ideal_pos = black_hole_pos + Vec3::new(particle.original_radius * angle.cos(), 0.0, particle.original_radius * angle.sin());
 
-                // Apply force towards ideal position
+                // Apply force towards ideal position with damping
                 let pinch_vector = ideal_pos - pos;
-                let force = pinch_vector * PINCH_STRENGTH;
+                let pinch_force = pinch_vector * PINCH_STRENGTH;
+                let drag_force = -particle.velocity * 0.1;
+                let force = pinch_force + drag_force;
                 particle.velocity += force * dt;
             }
         }

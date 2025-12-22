@@ -38,9 +38,10 @@ fn big_bang_burst(
 
         let position = black_hole_pos + Vec3::new(radius * angle_jittered.cos(), 0.0, radius * angle_jittered.sin());
 
-        // Initial tangential velocity
-        let orbital_speed = 20.0;
-        let velocity = Vec3::new(-angle_jittered.sin(), 0.0, angle_jittered.cos()) * orbital_speed;
+        // Initial tangential velocity matching galaxy rotation
+        let omega = (1.618 - 1.0) * 0.2;
+        let tangent = Vec3::new(-angle_jittered.sin(), 0.0, angle_jittered.cos());
+        let velocity = tangent * radius * omega;
 
         // Color based on radius
         let color = if radius < 10.0 {
