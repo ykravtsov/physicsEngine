@@ -6,6 +6,7 @@ mod simulation;
 use simulation::camera::{FlyCamera, FlyCameraPlugin};
 use simulation::emitter::EmitterPlugin;
 use simulation::galaxy::GalaxyPlugin;
+use simulation::gpu_galaxy::GpuGalaxyPlugin;
 use simulation::plasma::PlasmaPlugin;
 use simulation::render_settings::RenderSettingsPlugin;
 // use simulation::rendering::RenderingPlugin;
@@ -16,6 +17,7 @@ fn main() {
         .add_plugins(RenderSettingsPlugin)
         .add_plugins(FlyCameraPlugin)
         .add_plugins(GalaxyPlugin)
+        .add_plugins(GpuGalaxyPlugin)
         .add_plugins(PlasmaPlugin)
         .add_plugins(EmitterPlugin)
         // .add_plugins(RenderingPlugin)
