@@ -36,6 +36,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let y_vel = select(-80.0, 80.0, (id % 2u) == 0u);
         particle.vel = vec4<f32>(0.0, y_vel, 0.0, 0.0);
     } else {
+        // Golden Drag (Ether Viscosity)
+        particle.vel = particle.vel * (1.0 - (0.145898 * uniforms.dt));
+    
         // Phi Rotation: Calculate ideal spiral angle
         let ideal_angle = log(r) * PHI + uniforms.time * 0.1;
 
