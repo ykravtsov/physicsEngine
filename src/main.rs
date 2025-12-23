@@ -9,7 +9,6 @@ use simulation::galaxy::GalaxyPlugin;
 use simulation::gpu_galaxy::GpuGalaxyPlugin;
 use simulation::plasma::PlasmaPlugin;
 use simulation::render_settings::RenderSettingsPlugin;
-// use simulation::rendering::RenderingPlugin;
 
 fn main() {
     App::new()
@@ -20,7 +19,6 @@ fn main() {
         .add_plugins(GpuGalaxyPlugin)
         .add_plugins(PlasmaPlugin)
         .add_plugins(EmitterPlugin)
-        // .add_plugins(RenderingPlugin)
         .add_systems(Update, close_on_esc)
         .add_systems(Startup, setup_camera)
         .run();

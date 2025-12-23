@@ -11,6 +11,7 @@ const PHI: f32 = 1.6180339887498948482;
 pub struct Particle {
     pub pos: Vec4,
     pub vel: Vec4,
+    pub color: Vec4,
 }
 
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -68,6 +69,7 @@ fn setup_gpu_galaxy(
         particles.push(Particle {
             pos: Vec4::new(x, y, z, 1.0),
             vel: Vec4::new(tangent_x, 0.0, tangent_z, 0.0),
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0), // Initial white color
         });
     }
 

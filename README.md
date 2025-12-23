@@ -39,7 +39,7 @@ Use the mouse and keyboard to navigate the 3D space. Press Escape to exit.
 
 The QQM Vortex Equation formalizes the Phi Spiral + Z-Pinch physics simulation:
 
-$$\frac{\partial \vec{\psi}}{\partial t} = \underbrace{\nabla \times (\vec{v} \times \vec{B})}_{\text{Induction}} + \underbrace{\phi \cdot \ln(r)}_{\text{Golden Geometry}} - \underbrace{\frac{\mu_0 I}{2\pi r}}_{\text{Z-Pinch Tension}}$$
+$$\vec{F}_{net} = \underbrace{q(\vec{v} \times \vec{B})}_{\text{Lorentz Vector}} + \underbrace{\left( \phi \cdot \nabla \ln r \right) \hat{\theta}}_{\text{Geometric Drive}} - \underbrace{\left( \frac{\mu_0 I}{2\pi r} \right) \hat{r}}_{\text{Z-Pinch Tension}}$$
 
 ### Variable Definitions
 
@@ -47,6 +47,8 @@ $$\frac{\partial \vec{\psi}}{\partial t} = \underbrace{\nabla \times (\vec{v} \t
 - $\phi$ (Phi): The Golden Ratio ($1.618...$), representing the path of least resistance in the vortex.
 - $\nabla \times$: The Curl operator (Vortex Spin).
 - $Z_{pinch}$: The electromagnetic tension term ($1/r$) that replaces Dark Matter gravity ($1/r^2$).
+
+Note: The CPU implementation (`FluxQuaternion`) has been deprecated in favor of the WGSL Compute Shader implementation for performance (1M+ particles).
 
 ## License
 
