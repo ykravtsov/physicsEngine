@@ -1,6 +1,10 @@
 use bevy::prelude::*;
 use std::collections::VecDeque;
 use crate::simulation::galaxy::BlackHole;
+use crate::simulation::gpu_galaxy::PhiResource;
+
+const RESONANCE_SENSITIVITY: f32 = 1000.0;
+const GOLDEN_RATIO: f32 = 1.61803398875;
 
 pub struct PlasmaPlugin;
 
@@ -43,9 +47,6 @@ impl Default for CloudCentroid {
     }
 }
 
-const PHI: f32 = 1.618033988749;
-const PINCH_STRENGTH: f32 = 10.0;
-const DAMPING: f32 = 5.0;
 
 fn ideal_spiral_pos(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
@@ -81,10 +82,14 @@ pub fn update_galaxy_physics(
         Query<&Transform, With<BlackHole>>,
     )>,
     time: Res<Time>,
+    phi_res: Res<PhiResource>, // <--- INJECT THE RESOURCE
 ) {
     let black_hole_pos = param_set.p1().single().translation;
     let dt = time.delta_seconds();
     let galaxy_angle = time.elapsed_seconds() * 0.1;
+
+    // READ THE DYNAMIC PHI FROM KEYBOARD INPUT
+    let current_phi = phi_res.phi_value;
 
     for (mut particle, mut transform) in param_set.p0().iter_mut() {
         let pos = transform.translation;
@@ -106,17 +111,40 @@ pub fn update_galaxy_physics(
                 };
                 particle.color = Color::srgb(0.0, 1.0, 1.0); // Cyan
             } else {
-                // Z-Pinch Logic
-                let arm_offset = if particle.arm == 0 { 0.0 } else { std::f32::consts::PI };
-                let angle = (particle.original_radius.ln() / 0.3) + arm_offset + galaxy_angle;
-                let ideal_pos = black_hole_pos + Vec3::new(particle.original_radius * angle.cos(), 0.0, particle.original_radius * angle.sin());
+                // --- RESONANCE CHECK (The Fix) ---
+                // The Ether only vibrates effectively at the Golden Ratio.
+                // If the system is detuned, the "Pinch" loses coherence.
+                let golden_ratio = GOLDEN_RATIO;
+                let deviation = (current_phi - golden_ratio).abs();
 
-                // Apply force towards ideal position with damping
+                // Gaussian Falloff: High sensitivity (RESONANCE_SENSITIVITY).
+                // Small deviations causes massive loss of force.
+                let resonance = (-deviation * deviation * RESONANCE_SENSITIVITY).exp();
+
+                // --- Z-PINCH LOGIC ---
+                let arm_offset = if particle.arm == 0 { 0.0 } else { std::f32::consts::PI };
+
+                // We still calculate target based on current input to visualize the "attempt",
+                // but the STRENGTH of the result depends on Resonance.
+                let angle = (particle.original_radius.ln() * current_phi) + arm_offset + galaxy_angle;
+
+                let ideal_pos = black_hole_pos + Vec3::new(
+                    particle.original_radius * angle.cos(),
+                    0.0,
+                    particle.original_radius * angle.sin()
+                );
+
+                // Apply Forces
                 let pinch_vector = ideal_pos - pos;
-                let pinch_force = pinch_vector * PINCH_STRENGTH;
-                let drag_force = -particle.velocity * 0.1;
-                let force = pinch_force + drag_force;
-                particle.velocity += force * dt;
+
+                // APPLY RESONANCE TO THE FORCE
+                // If resonance is 1.0 (Tuned), force is 10.0.
+                // If resonance is 0.0 (Detuned), force is 0.0 -> Galaxy flies apart.
+                let pinch_force = pinch_vector * 10.0 * resonance;
+
+                let drag_force = -particle.velocity * 0.5;
+
+                particle.velocity += (pinch_force + drag_force) * dt;
             }
         }
 

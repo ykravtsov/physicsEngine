@@ -91,3 +91,27 @@ The simulation demonstrates that galactic structures behave analogously to **vib
 
 **CONCLUSION:**
 In this framework, **Matter is Resonance**. The simulation visualizes the "music" of the Ether, where the Golden Ratio ($\phi$) dictates the tuning of the cosmic instrument.
+
+## 🔬 Interactive Sensitivity Analysis
+
+The simulation includes a real-time "Tuner" to test the QQM hypothesis: **"Is the Golden Ratio ($\phi \approx 1.618$) the only mathematically stable configuration for a spiral galaxy?"**
+
+### Controls
+
+| Key             | Action                  | Physics Effect                                                   |
+| :-------------- | :---------------------- | :--------------------------------------------------------------- |
+| **Right Arrow** | Increase $\phi$ (+0.01) | **Detune:** Moves the standing wave target, breaking resonance.  |
+| **Left Arrow**  | Decrease $\phi$ (-0.01) | **Detune:** Moves the standing wave target, breaking resonance.  |
+| **Spacebar**    | Reset to $\phi = 1.618$ | **Resonance:** Restores the Golden Ratio. Gravity snaps back on. |
+
+### The Experiment
+
+1.  **Observation (T=0):** The galaxy begins in a stable, 2-arm Barred Spiral configuration. The "Resonance Factor" is 100%.
+2.  **Perturbation:** Press **Right Arrow** to drift the value to `1.65`.
+3.  **Result:**
+    - The "Pinch Force" drops to near zero as the system detunes.
+    - The spiral arms lose coherence.
+    - Stars, retaining their orbital velocity but losing their centripetal guide, fly off tangentially.
+4.  **Restoration:** Press **Spacebar**. The mathematical "groove" is restored, and the galaxy violently re-assembles.
+
+**Conclusion:** The simulation demonstrates that the structure is not arbitrary; it is a **Resonant Mode** of the Ether, strictly bound to the geometry of $\phi$.
