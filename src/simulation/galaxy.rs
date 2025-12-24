@@ -35,18 +35,19 @@ pub struct TrailPoint {
 }
 
 fn setup_galaxy(mut commands: Commands) {
-    // Spawn stars
+    // Spawn stars in random disk for emergent spiral behavior
     for _ in 0..10000 {
+        let theta = rand::random::<f32>() * std::f32::consts::TAU;
+        let r = rand::random::<f32>().sqrt() * 50.0;
+        let y = (rand::random::<f32>() - 0.5) * 4.0;
         let pos = Vec3::new(
-            (rand::random::<f32>() - 0.5) * 100.0,
-            (rand::random::<f32>() - 0.5) * 100.0,
-            (rand::random::<f32>() - 0.5) * 100.0,
+            r * theta.cos(),
+            y,
+            r * theta.sin(),
         );
-        let velocity = Vec3::new(
-            rand::random::<f32>() - 0.5,
-            rand::random::<f32>() - 0.5,
-            rand::random::<f32>() - 0.5,
-        ).normalize() * 10.0;
+        let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
+        let speed = 15.0;
+        let velocity = tangent * speed + Vec3::new(0.0, (rand::random::<f32>() - 0.5) * 0.5, 0.0);
         commands.spawn((
             Star { velocity },
             Transform::from_translation(pos),

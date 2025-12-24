@@ -58,25 +58,36 @@ fn setup_gpu_galaxy(
     // Create particle buffer with initial spiral data
     let mut particles = Vec::with_capacity(NUM_PARTICLES);
 
-    // Genesis Alignment: Initialize particles in stable spiral formation
-    for i in 0..NUM_PARTICLES {
-        let t = i as f32 / NUM_PARTICLES as f32;
-        let r = 1.0 + t * 50.0; // Radius from 1 to 51
-        let angle = t * 20.0 * std::f32::consts::PI + (i % 2) as f32 * std::f32::consts::PI; // Two arms
+    // Chaos Initialization: Random disk for emergent spiral behavior
+    for _ in 0..NUM_PARTICLES {
+        // 1. CHAOS POSITION (Random Blob)
+        let theta = rand::random::<f32>() * std::f32::consts::TAU;
+        // Square root ensures uniform distribution on a disk (avoids clumping at center)
+        let r = rand::random::<f32>().sqrt() * 50.0;
+        let y = (rand::random::<f32>() - 0.5) * 4.0; // Thick accretion disk
 
-        let x = r * angle.cos();
-        let z = r * angle.sin();
-        let y = (rand::random::<f32>() - 0.5) * 2.0; // Small Y variation
+        let pos = Vec4::new(
+            r * theta.cos(),
+            y,
+            r * theta.sin(),
+            1.0 // Life/Padding
+        );
 
-        // Initial velocity tangent to the spiral
-        let speed = 10.0 + rand::random::<f32>() * 5.0;
-        let tangent_x = -z / r * speed;
-        let tangent_z = x / r * speed;
+        // 2. NEUTRAL VELOCITY (No Spiral Bias)
+        // We give it pure orbital velocity. If a spiral forms, it's because the PHYSICS did it.
+        let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
+        let speed = 15.0; // Start slow, let the Z-Pinch accelerate them
+        let vel = Vec4::new(
+            tangent.x * speed,
+            (rand::random::<f32>() - 0.5) * 0.5, // Tiny vertical drift
+            tangent.z * speed,
+            0.0
+        );
 
         particles.push(Particle {
-            pos: Vec4::new(x, y, z, 1.0),
-            vel: Vec4::new(tangent_x, 0.0, tangent_z, 0.0),
-            color: Vec4::new(1.0, 1.0, 1.0, 1.0), // Initial white color
+            pos,
+            vel,
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
         });
     }
 
