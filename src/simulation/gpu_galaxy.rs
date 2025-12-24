@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
+use rand::Rng;
 
 const NUM_PARTICLES: usize = 1_000_000;
 const WORKGROUP_SIZE: u32 = 64;
@@ -21,6 +22,7 @@ pub struct GalaxyUniforms {
     pub dt: f32,
     pub pinch_strength: f32,
     pub phi_value: f32,
+    pub arms: f32,
 }
 
 #[derive(Resource)]
@@ -58,13 +60,31 @@ fn setup_gpu_galaxy(
     // Create particle buffer with initial spiral data
     let mut particles = Vec::with_capacity(NUM_PARTICLES);
 
-    // Chaos Initialization: Random disk for emergent spiral behavior
-    for _ in 0..NUM_PARTICLES {
-        // 1. CHAOS POSITION (Random Blob)
-        let theta = rand::random::<f32>() * std::f32::consts::TAU;
-        // Square root ensures uniform distribution on a disk (avoids clumping at center)
-        let r = rand::random::<f32>().sqrt() * 50.0;
-        let y = (rand::random::<f32>() - 0.5) * 4.0; // Thick accretion disk
+    // Genesis Initialization (Pre-formed Spiral)
+    let mut rng = rand::thread_rng();
+
+    for i in 0..NUM_PARTICLES {
+        // 1. DISTRIBUTE RADIUS
+        // Use square root for even disk distribution, then spread out
+        let r: f32 = rng.gen_range(2.0..60.0);
+
+        // 2. CALCULATE PERFECT GOLDEN SPIRAL POSITION
+        let phi = 1.618034;
+        let b = 0.3; // Tightness of the spiral
+
+        // The fundamental spiral equation: Angle = ln(r) * phi
+        let base_theta = r.ln() * phi;
+
+        // 3. CREATE 2 ARMS (The Propeller)
+        // Even particles go to Arm A (0 rad), Odd particles go to Arm B (PI rad)
+        let arm_offset = if i % 2 == 0 { 0.0 } else { std::f32::consts::PI };
+
+        // 4. ADD "FUZZ" (Thickness)
+        // A galaxy isn't a thin line; it's a thick stream.
+        let fuzz = (rng.r#gen::<f32>() - 0.5) * 0.8;
+
+        let theta = base_theta + arm_offset + fuzz;
+        let y = rng.gen_range(-1.5..1.5); // Disk thickness
 
         let pos = Vec4::new(
             r * theta.cos(),
@@ -73,22 +93,19 @@ fn setup_gpu_galaxy(
             1.0 // Life/Padding
         );
 
-        // 2. NEUTRAL VELOCITY (No Spiral Bias)
-        // We give it pure orbital velocity. If a spiral forms, it's because the PHYSICS did it.
+        // 5. ORBITAL VELOCITY
+        // Give them perfect tangent velocity so they are stable at T=0
         let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
-        let speed = 15.0; // Start slow, let the Z-Pinch accelerate them
+        let speed = 15.0; // Adjust speed to match your pinch strength
+
         let vel = Vec4::new(
             tangent.x * speed,
-            (rand::random::<f32>() - 0.5) * 0.5, // Tiny vertical drift
+            0.0,
             tangent.z * speed,
             0.0
         );
 
-        particles.push(Particle {
-            pos,
-            vel,
-            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
-        });
+        particles.push(Particle { pos, vel, color: Vec4::new(1.0, 1.0, 1.0, 1.0) });
     }
 
     let particle_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -101,8 +118,9 @@ fn setup_gpu_galaxy(
     let uniforms = GalaxyUniforms {
         time: 0.0,
         dt: 0.016, // ~60 FPS
-        pinch_strength: 5.0,
+        pinch_strength: 0.1,
         phi_value: 1.618034,
+        arms: 2.0,
     };
 
     let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -193,8 +211,9 @@ fn update_gpu_galaxy(
     let uniforms = GalaxyUniforms {
         time: time.elapsed_seconds(),
         dt: time.delta_seconds(),
-        pinch_strength: 5.0,
+        pinch_strength: 0.1,
         phi_value: phi_resource.phi_value,
+        arms: 2.0,
     };
 
     render_queue.write_buffer(&resources.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
