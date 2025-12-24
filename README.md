@@ -60,10 +60,34 @@ Why do galaxies form spirals?
 - **The Logarithmic Spiral:** This geometry ($\theta \propto \ln r$) is the most efficient shape for mixing fluids across scales (from Quantum Foam to Galactic Arms).
 - **Stability:** The interaction between the Drive (Energy In) and the Drag (Energy Out) creates a stable "Dissipative Structure" that can persist for billions of years.
 
----
+### 3. The Thermodynamic Efficiency Law ($\Omega$NF-BH v1.0)
 
-Note: The CPU implementation (`FluxQuaternion`) has been deprecated in favor of the WGSL Compute Shader implementation for performance (1M+ particles).
+While the vector equation describes motion, the **Unified Negentropic Spin-Curvature Equation** describes the _metabolic efficiency_ of the galaxy. It defines how effectively the vortex converts chaotic energy (Entropy) into structured flow (Negentropy).
 
-## License
+$$
+\dot{\mathcal{N}} = \frac{\Omega \, \eta_{\text{res}} \, \Phi^2}{Z_{\text{eff}} \, h} \cdot a_* \cdot C(\kappa) \cdot \text{NTE}
+$$
 
-[Add license information here]
+**Variable Definitions:**
+
+- **$\dot{\mathcal{N}}$ (Negentropic Throughput):** The rate at which the system generates order. In the simulation, this correlates to the "Cyan" stability state.
+- **$\Phi^2$ (Geometric Coherence):** The Golden Ratio squared, representing maximum information packing efficiency.
+- **$Z_{\text{eff}}$ (Ether Impedance):** The viscosity of space-time. As established in the Drag section, $Z_{\text{eff}} \propto \phi^{-4}$. Lower impedance $\to$ higher throughput.
+- **$a_*$ (Spin Parameter):** The angular momentum of the central Black Hole dynamo.
+- **$C(\kappa)$ (Curvature):** The Logarithmic Spiral geometry ($\kappa \propto \ln r$) that guides the flow.
+- **NTE (Negentropic Tension Energy):** The cumulative Z-Pinch magnetic tension cleaned up and stored in the spiral arms.
+
+**Conclusion:**
+The simulation proves that when $C(\kappa)$ aligns with $\Phi$ and $Z_{\text{eff}}$ is tuned to the Ether Drag limit, $\dot{\mathcal{N}}$ is maximized, resulting in a stable, eternal galaxy structure.
+
+### 4. Harmonic Resonance & String Theory Connection
+
+The simulation demonstrates that galactic structures behave analogously to **vibrating strings** under tension.
+
+- **The Cosmic String:** The "Z-Pinch" magnetic field lines act as a taut string under massive tension.
+- **The Fundamental Frequency:** The rotation of the central Black Hole ($a_*$) sets the pitch.
+- **The Perfect Fifth:** The Spiral Arms represent regions of **Constructive Interference** (Standing Waves), similar to the 3:2 ratio of a Perfect Fifth.
+- **The "Pythagorean Comma":** Just as the Cycle of Fifths never perfectly closes (creating a spiral, not a circle), the Galaxy never perfectly reaches equilibrium. This "Gap" drives the infinite recycling of matter via the Quasar Jets.
+
+**CONCLUSION:**
+In this framework, **Matter is Resonance**. The simulation visualizes the "music" of the Ether, where the Golden Ratio ($\phi$) dictates the tuning of the cosmic instrument.

@@ -14,9 +14,9 @@ struct GalaxyUniforms {
     time: f32,
     dt: f32,
     pinch_strength: f32,
+    phi_value: f32,
 };
 
-const PHI: f32 = 1.6180339887498948482;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -37,10 +37,11 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         particle.vel = vec4<f32>(0.0, y_vel, 0.0, 0.0);
     } else {
         // Golden Drag (Ether Viscosity)
-        particle.vel = particle.vel * (1.0 - (0.145898 * uniforms.dt));
+        let phi_drag = pow(uniforms.phi_value, -4.0);
+        particle.vel = particle.vel * (1.0 - (phi_drag * uniforms.dt));
     
         // Phi Rotation: Calculate ideal spiral angle
-        let ideal_angle = log(r) * PHI + uniforms.time * 0.1;
+        let ideal_angle = log(r) * uniforms.phi_value + uniforms.time * 0.1;
 
         // Ideal position on the spiral arm
         let ideal_x = r * cos(ideal_angle);

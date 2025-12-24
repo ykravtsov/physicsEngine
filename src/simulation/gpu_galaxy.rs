@@ -20,6 +20,7 @@ pub struct GalaxyUniforms {
     pub time: f32,
     pub dt: f32,
     pub pinch_strength: f32,
+    pub phi_value: f32,
 }
 
 #[derive(Resource)]
@@ -35,12 +36,18 @@ pub struct GpuParticle {
     pub entity_index: usize,
 }
 
+#[derive(Resource)]
+pub struct PhiResource {
+    pub phi_value: f32,
+}
+
 pub struct GpuGalaxyPlugin;
 
 impl Plugin for GpuGalaxyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (setup_gpu_galaxy, spawn_gpu_particles))
-            .add_systems(Update, (update_gpu_galaxy, update_particle_transforms));
+        app.insert_resource(PhiResource { phi_value: 1.618034 })
+            .add_systems(Startup, (setup_gpu_galaxy, spawn_gpu_particles))
+            .add_systems(Update, (update_phi_input, update_gpu_galaxy, update_particle_transforms));
     }
 }
 
@@ -84,6 +91,7 @@ fn setup_gpu_galaxy(
         time: 0.0,
         dt: 0.016, // ~60 FPS
         pinch_strength: 5.0,
+        phi_value: 1.618034,
     };
 
     let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -168,12 +176,14 @@ fn update_gpu_galaxy(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mut resources: ResMut<GpuGalaxyResources>,
+    phi_resource: Res<PhiResource>,
 ) {
     // Update uniforms
     let uniforms = GalaxyUniforms {
         time: time.elapsed_seconds(),
         dt: time.delta_seconds(),
         pinch_strength: 5.0,
+        phi_value: phi_resource.phi_value,
     };
 
     render_queue.write_buffer(&resources.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -222,4 +232,26 @@ fn update_particle_transforms(
 
     // Note: Reading back 1M particles every frame would be very slow
     // A proper implementation would use GPU-only rendering
+}
+
+fn update_phi_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut phi_resource: ResMut<PhiResource>,
+) {
+    let mut changed = false;
+    if keyboard_input.just_pressed(KeyCode::ArrowRight) {
+        phi_resource.phi_value += 0.01;
+        changed = true;
+    }
+    if keyboard_input.just_pressed(KeyCode::ArrowLeft) {
+        phi_resource.phi_value -= 0.01;
+        changed = true;
+    }
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        phi_resource.phi_value = 1.618034;
+        changed = true;
+    }
+    if changed {
+        println!("Phi value: {:.6}", phi_resource.phi_value);
+    }
 }
