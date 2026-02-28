@@ -9,7 +9,12 @@ struct Particle {
     color: vec4<f32>,
 };
 
-@group(0) @binding(0) var<storage, read> particles: array<Particle>;
+@group(1) @binding(0) var<uniform> uniforms: GpuGalaxyMaterialUniforms;
+@group(1) @binding(1) var<storage, read> particles: array<Particle>;
+
+struct GpuGalaxyMaterialUniforms {
+    particle_count: u32,
+};
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -21,6 +26,11 @@ fn vertex(
     @builtin(vertex_index) vertex_index: u32,
     @builtin(instance_index) instance_index: u32,
 ) -> VertexOutput {
+    // Skip if instance_index >= particle_count
+    if (instance_index >= uniforms.particle_count) {
+        return VertexOutput(vec4<f32>(0.0), vec4<f32>(0.0));
+    }
+
     // Simple quad vertices for each particle
     let quad_vertices = array<vec2<f32>, 6>(
         vec2<f32>(-0.5, -0.5), // bottom left

@@ -3,9 +3,19 @@ use bevy::render::render_resource::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use rand::Rng;
 
-const NUM_PARTICLES: usize = 1_000_000;
 const WORKGROUP_SIZE: u32 = 64;
 const PHI: f32 = 1.6180339887498948482;
+
+#[derive(Resource)]
+pub struct ParticleCount {
+    pub count: usize,
+}
+
+impl Default for ParticleCount {
+    fn default() -> Self {
+        Self { count: 100_000 } // Reduced default for better performance
+    }
+}
 
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
@@ -48,6 +58,7 @@ pub struct GpuGalaxyPlugin;
 impl Plugin for GpuGalaxyPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PhiResource { phi_value: 1.618034 })
+            .init_resource::<ParticleCount>()
             .add_systems(Startup, (setup_gpu_galaxy, spawn_gpu_particles))
             .add_systems(Update, (update_phi_input, update_gpu_galaxy, update_particle_transforms));
     }
@@ -56,14 +67,15 @@ impl Plugin for GpuGalaxyPlugin {
 fn setup_gpu_galaxy(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
+    particle_count: Res<ParticleCount>,
 ) {
     // Create particle buffer with initial spiral data
-    let mut particles = Vec::with_capacity(NUM_PARTICLES);
+    let mut particles = Vec::with_capacity(particle_count.count);
 
     // Genesis Initialization (Pre-formed Spiral)
     let mut rng = rand::thread_rng();
 
-    for i in 0..NUM_PARTICLES {
+    for i in 0..particle_count.count {
         // 1. DISTRIBUTE RADIUS
         // Use square root for even disk distribution, then spread out
         let r: f32 = rng.gen_range(2.0..60.0);
@@ -206,6 +218,7 @@ fn update_gpu_galaxy(
     render_queue: Res<RenderQueue>,
     mut resources: ResMut<GpuGalaxyResources>,
     phi_resource: Res<PhiResource>,
+    particle_count: Res<ParticleCount>,
 ) {
     // Update uniforms
     let uniforms = GalaxyUniforms {
@@ -231,18 +244,19 @@ fn update_gpu_galaxy(
 
         compute_pass.set_pipeline(&resources.compute_pipeline);
         compute_pass.set_bind_group(0, &resources.bind_group, &[]);
-        compute_pass.dispatch_workgroups((NUM_PARTICLES as u32 + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
+        compute_pass.dispatch_workgroups(((particle_count.count as u32) + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
     }
 
     render_queue.submit([command_encoder.finish()]);
 }
 
-fn spawn_gpu_particles(mut commands: Commands) {
-    // Spawn a subset of particles for rendering (10,000 out of 1,000,000)
+fn spawn_gpu_particles(mut commands: Commands, particle_count: Res<ParticleCount>) {
+    // Spawn a subset of particles for rendering (10,000 out of total)
     const VISIBLE_PARTICLES: usize = 10_000;
-    let step = NUM_PARTICLES / VISIBLE_PARTICLES;
+    let num_to_spawn = VISIBLE_PARTICLES.min(particle_count.count);
+    let step = if num_to_spawn > 0 { particle_count.count / num_to_spawn } else { 1 };
 
-    for i in 0..VISIBLE_PARTICLES {
+    for i in 0..num_to_spawn {
         let particle_index = i * step;
         commands.spawn((
             GpuParticle { entity_index: particle_index },
