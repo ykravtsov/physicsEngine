@@ -48,11 +48,13 @@ impl Default for CloudCentroid {
 }
 
 
+#[allow(dead_code)]
 fn ideal_spiral_pos(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
     Vec3::new(r * theta.cos(), 0.0, r * theta.sin())
 }
 
+#[allow(dead_code)]
 fn arm_tangent(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
     let dr_dtheta = r / b;

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::time::{Timer, TimerMode};
-use crate::simulation::plasma::{update_galaxy_physics, PlasmaParticle};
+use crate::simulation::plasma::update_galaxy_physics;
 
 pub struct GalaxyPlugin;
 
@@ -24,7 +24,9 @@ pub struct Star {
 
 #[derive(Component)]
 pub struct BlackHole {
+    #[allow(dead_code)]
     pub stored_mass: usize,
+    #[allow(dead_code)]
     pub velocity: Vec3,
 }
 

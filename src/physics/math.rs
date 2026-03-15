@@ -1,5 +1,6 @@
 use std::ops::Mul;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FluxQuaternion {
     pub w: f32, // Scalar Pressure (Ether Density)
@@ -8,6 +9,7 @@ pub struct FluxQuaternion {
     pub z: f32, // Vector Flow Z
 }
 
+#[allow(dead_code)]
 impl FluxQuaternion {
     pub fn new(w: f32, x: f32, y: f32, z: f32) -> Self {
         Self { w, x, y, z }

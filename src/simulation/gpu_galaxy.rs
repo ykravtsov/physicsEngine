@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 use rand::Rng;
 
 const WORKGROUP_SIZE: u32 = 64;
+#[allow(dead_code)]
 const PHI: f32 = 1.6180339887498948482;
 
 #[derive(Resource)]
@@ -17,6 +20,7 @@ impl Default for ParticleCount {
     }
 }
 
+#[allow(dead_code)]
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct Particle {
@@ -25,6 +29,7 @@ pub struct Particle {
     pub color: Vec4,
 }
 
+#[allow(dead_code)]
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct GalaxyUniforms {
@@ -37,6 +42,7 @@ pub struct GalaxyUniforms {
 
 #[derive(Resource)]
 pub struct GpuGalaxyResources {
+    #[allow(dead_code)]
     pub particle_buffer: Buffer,
     pub uniform_buffer: Buffer,
     pub compute_pipeline: ComputePipeline,
@@ -45,6 +51,7 @@ pub struct GpuGalaxyResources {
 
 #[derive(Component)]
 pub struct GpuParticle {
+    #[allow(dead_code)]
     pub entity_index: usize,
 }
 
@@ -82,7 +89,7 @@ fn setup_gpu_galaxy(
 
         // 2. CALCULATE PERFECT GOLDEN SPIRAL POSITION
         let phi = 1.618034;
-        let b = 0.3; // Tightness of the spiral
+        let _b = 0.3; // Tightness of the spiral
 
         // The fundamental spiral equation: Angle = ln(r) * phi
         let base_theta = r.ln() * phi;
@@ -216,7 +223,7 @@ fn update_gpu_galaxy(
     time: Res<Time>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mut resources: ResMut<GpuGalaxyResources>,
+    resources: ResMut<GpuGalaxyResources>,
     phi_resource: Res<PhiResource>,
     particle_count: Res<ParticleCount>,
 ) {
@@ -266,9 +273,9 @@ fn spawn_gpu_particles(mut commands: Commands, particle_count: Res<ParticleCount
 }
 
 fn update_particle_transforms(
-    mut query: Query<(&GpuParticle, &mut Transform)>,
-    resources: Res<GpuGalaxyResources>,
-    render_device: Res<RenderDevice>,
+    _query: Query<(&GpuParticle, &mut Transform)>,
+    _resources: Res<GpuGalaxyResources>,
+    _render_device: Res<RenderDevice>,
 ) {
     // This is a simplified approach - in practice, you'd want to read back
     // the buffer data and update transforms

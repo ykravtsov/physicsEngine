@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::simulation::galaxy::BlackHole;
 
+#[allow(dead_code)]
 pub struct EtherVizPlugin;
 
 impl Plugin for EtherVizPlugin {
@@ -9,6 +10,7 @@ impl Plugin for EtherVizPlugin {
     }
 }
 
+#[allow(dead_code)]
 fn draw_ether_flow(mut gizmos: Gizmos, black_hole_query: Query<&Transform, With<BlackHole>>) {
     let black_hole_pos = black_hole_query.single().translation;
     const PHI_INV_4: f32 = 0.1464466094067262; // φ^{-4}
