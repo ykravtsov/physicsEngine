@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.14"
+# Custom engine dependencies (no Bevy)
+winit = "0.30"
+wgpu = "22"
 rand = "0.8"
 bytemuck = { version = "1.0", features = ["derive"] }
+pollster = "0.3"
+env_logger = "0.11"
+log = "0.4"
+
+# Keep Bevy for the old galaxy simulation (can be removed later)
+# bevy = "0.14"

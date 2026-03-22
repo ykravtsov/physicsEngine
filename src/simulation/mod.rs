@@ -5,3 +5,4 @@ pub mod gpu_galaxy;
 pub mod debug_viz;
 pub mod plasma;
 pub mod render_settings;
+pub mod hurricane;
