@@ -1,6 +1,5 @@
-use std::ops::Mul;
+use std::ops::{Mul, Add, Sub, Neg};
 
-#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FluxQuaternion {
     pub w: f32, // Scalar Pressure (Ether Density)
@@ -9,7 +8,6 @@ pub struct FluxQuaternion {
     pub z: f32, // Vector Flow Z
 }
 
-#[allow(dead_code)]
 impl FluxQuaternion {
     pub fn new(w: f32, x: f32, y: f32, z: f32) -> Self {
         Self { w, x, y, z }
@@ -25,22 +23,31 @@ impl FluxQuaternion {
         }
     }
 
-    // Apply Golden Drag: rotate the flow vector by μ ≈ φ^{-4} around z-axis
-    pub fn apply_golden_drag(&self) -> FluxQuaternion {
-        const PHI_INV_4: f32 = 0.146446609406726237799577818947237528; // φ^{-4}
-        let cos_mu = PHI_INV_4.cos();
-        let sin_mu = PHI_INV_4.sin();
 
-        // Rotate (x, y) around z by μ
-        let new_x = self.x * cos_mu - self.y * sin_mu;
-        let new_y = self.x * sin_mu + self.y * cos_mu;
+    pub fn norm_sq(&self) -> f32 {
+        self.w * self.w + self.x * self.x + self.y * self.y + self.z * self.z
+    }
 
-        FluxQuaternion {
-            w: self.w,
-            x: new_x,
-            y: new_y,
-            z: self.z,
+    pub fn normalize(&self) -> Self {
+        let n = self.norm_sq().sqrt();
+        if n < 1e-6 {
+            Self::new(1.0, 0.0, 0.0, 0.0)
+        } else {
+            Self { w: self.w / n, x: self.x / n, y: self.y / n, z: self.z / n }
         }
+    }
+
+    // Compute interaction between two waves (for light, gravity, wind effects)
+    pub fn interact(&self, other: &Self) -> Self {
+        // Non-linear interaction for vortex theory: product + interference
+        let product = self.mul(other);
+        let interference = Self::new(
+            self.w * other.w, // pressure interference
+            self.x * other.y - self.y * other.x, // cross terms for vortex
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+        );
+        (product + interference).normalize()
     }
 }
 
@@ -53,6 +60,45 @@ impl Mul for FluxQuaternion {
             x: self.w * rhs.x + self.x * rhs.w + self.y * rhs.z - self.z * rhs.y,
             y: self.w * rhs.y - self.x * rhs.z + self.y * rhs.w + self.z * rhs.x,
             z: self.w * rhs.z + self.x * rhs.y - self.y * rhs.x + self.z * rhs.w,
+        }
+    }
+}
+
+impl Add for FluxQuaternion {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            w: self.w + rhs.w,
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
+}
+
+impl Sub for FluxQuaternion {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            w: self.w - rhs.w,
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Neg for FluxQuaternion {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            w: -self.w,
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
         }
     }
 }
