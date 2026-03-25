@@ -38,6 +38,8 @@ impl FluxQuaternion {
     }
 
     // Compute interaction between two waves (for light, gravity, wind effects)
+    // NOTE: original version normalized the result, destroying magnitude (angular momentum).
+    // This version preserves magnitude so conservation laws hold correctly.
     pub fn interact(&self, other: &Self) -> Self {
         // Non-linear interaction for vortex theory: product + interference
         let product = self.mul(other);
@@ -47,7 +49,30 @@ impl FluxQuaternion {
             self.y * other.z - self.z * other.y,
             self.z * other.x - self.x * other.z,
         );
-        (product + interference).normalize()
+        // Do NOT normalize — magnitude encodes kinetic energy / angular momentum.
+        product + interference
+    }
+
+    /// Add a force vector directly to the xyz (velocity) components without
+    /// touching the scalar w (pressure). Used when you want clean Euler integration
+    /// rather than quaternion multiplication so momentum is conserved.
+    pub fn add_force(&self, fx: f32, fy: f32, fz: f32, dt: f32) -> Self {
+        Self {
+            w: self.w,
+            x: self.x + fx * dt,
+            y: self.y + fy * dt,
+            z: self.z + fz * dt,
+        }
+    }
+
+    /// Scale only the velocity (xyz) components, leaving pressure (w) unchanged.
+    pub fn scale_velocity(&self, s: f32) -> Self {
+        Self { w: self.w, x: self.x * s, y: self.y * s, z: self.z * s }
+    }
+
+    /// Return the speed (magnitude of the xyz vector part).
+    pub fn speed(&self) -> f32 {
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 }
 

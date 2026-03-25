@@ -153,39 +153,75 @@ fn update_stars(
     time: Res<Time>,
 ) {
     let black_hole_pos = param_set.p1().single().translation;
-    // The Drag Constant (Phi^-4)
-    const PHI_INV_4: f32 = 0.1464466094067262;
-    let cos_mu = PHI_INV_4.cos();
-    let sin_mu = PHI_INV_4.sin();
 
-    // The "Black Hole" Suction Strength (Gravity)
-    let suction_strength = 5.0;
+    // Gravitational constant (tune to taste)
+    let gm: f32 = 300.0;
+    // Small inward "drag" fraction per second that keeps stars on spiraling paths
+    // rather than pure circular orbits.  Value ~0.003 gives a gentle inward drift.
+    let spiral_inward: f32 = 0.003;
+    let max_speed: f32 = 40.0;
 
     for (mut star, mut transform) in param_set.p0().iter_mut() {
         let dt = time.delta_seconds();
         let pos = transform.translation;
 
-        // 1. CALCULATE SUCTION (Gravity) as quaternion wave
         let to_center = black_hole_pos - pos;
-        let dist_sq = to_center.length_squared();
+        let dist = to_center.length().max(0.5);
 
-        // In QQM, suction is high near the drain - represent as quaternion wave
-        let suction_wave = if dist_sq > 0.1 {
-            let suction_vector = to_center.normalize() * (suction_strength / pos.length().max(1.0));
-            FluxQuaternion::new(0.0, suction_vector.x, suction_vector.y, suction_vector.z)
-        } else {
-            FluxQuaternion::new(0.0, 0.0, 0.0, 0.0)
-        };
+        // FIX 1: Gravity = GM/r² (inverse-square), NOT 1/r.
+        let grav_accel = to_center.normalize() * (gm / (dist * dist));
 
-        // 2. APPLY GOLDEN DRAG (The Spin) as quaternion rotation
-        let drag_rotation = FluxQuaternion::new(cos_mu, 0.0, 0.0, sin_mu);
+        // FIX 2: Differential rotation — Keplerian angular velocity ω = sqrt(GM/r³).
+        // Each star gets its own rotation angle this frame so inner stars rotate faster.
+        let omega = (gm / (dist * dist * dist)).sqrt(); // rad/s, decreases with r
+        let angle = omega * dt;
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        // Rotate around the galaxy's spin axis (Y-axis in this 3-D layout).
+        let rot_y = FluxQuaternion::new(cos_a, 0.0, sin_a, 0.0);
 
-        // Update quaternion state with wave interactions
-        star.quaternion_state = star.quaternion_state.interact(&suction_wave);
-        star.quaternion_state = drag_rotation.mul(&star.quaternion_state);
+        // FIX 3: Apply gravity as a direct velocity integration (preserves momentum).
+        star.quaternion_state = star.quaternion_state.add_force(
+            grav_accel.x, grav_accel.y, grav_accel.z, dt,
+        );
 
-        // 3. UPDATE POSITION using quaternion velocity vector
-        let velocity_vec = Vec3::new(star.quaternion_state.x, star.quaternion_state.y, star.quaternion_state.z);
+        // Apply differential rotation to the velocity vector.
+        star.quaternion_state = rot_y.mul(&star.quaternion_state);
+
+        // FIX 4: Small inward radial component creates the logarithmic spiral.
+        // Without this particles just orbit; with it they slowly wind inward like
+        // a galaxy arm or hurricane band.
+        let inward = to_center.normalize() * spiral_inward;
+        star.quaternion_state = star.quaternion_state.add_force(
+            inward.x, inward.y, inward.z, 1.0, // already scaled
+        );
+
+        // Clamp to max speed so centre doesn't blow up.
+        let spd = star.quaternion_state.speed();
+        if spd > max_speed {
+            star.quaternion_state = star.quaternion_state.scale_velocity(max_speed / spd);
+        }
+
+        // UPDATE POSITION from velocity.
+        let velocity_vec = Vec3::new(
+            star.quaternion_state.x,
+            star.quaternion_state.y,
+            star.quaternion_state.z,
+        );
         transform.translation += velocity_vec * dt;
+
+        // Respawn stars that fall into the black hole centre.
+        if dist < 1.2 {
+            let theta = rand::random::<f32>() * std::f32::consts::TAU;
+            let spawn_r = 20.0 + rand::random::<f32>() * 30.0;
+            transform.translation = Vec3::new(
+                spawn_r * theta.cos(),
+                (rand::random::<f32>() - 0.5) * 4.0,
+                spawn_r * theta.sin(),
+            );
+            let tangent = Vec3::new(-transform.translation.z, 0.0, transform.translation.x).normalize();
+            let v = tangent * (gm / spawn_r).sqrt();
+            star.quaternion_state = FluxQuaternion::new(1.0, v.x, v.y, v.z);
+        }
     }
 }

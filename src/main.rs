@@ -25,6 +25,7 @@ async fn run() {
         let attrs = Window::default_attributes()
             .with_title("Quaternion Vortex Engine — Hurricane")
             .with_inner_size(winit::dpi::LogicalSize::new(1280u32, 720u32));
+        #[allow(deprecated)]
         event_loop.create_window(attrs).expect("Failed to create window")
     };
 
@@ -37,7 +38,7 @@ async fn run() {
     camera.move_speed = 50.0;
 
     let mut hurricane = HurricaneSimulation::new(50000);
-    let mut renderer = hurricane_3d::renderer::ParticleRenderer::new(&gpu.device, &gpu.config);
+    let renderer = hurricane_3d::renderer::ParticleRenderer::new(&gpu.device, &gpu.config);
 
     let mut last_time = std::time::Instant::now();
 
@@ -45,6 +46,7 @@ async fn run() {
     window.set_cursor_visible(false);
     let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
 
+    #[allow(deprecated)]
     event_loop.run(move |event, elwt| {
         elwt.set_control_flow(ControlFlow::Poll);
 

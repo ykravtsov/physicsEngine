@@ -23,6 +23,7 @@ impl FluxQuaternion {
         Self::new(1.0, 0.0, 0.0, 0.0)
     }
 
+    #[allow(dead_code)]
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0, 0.0)
     }
@@ -81,6 +82,7 @@ impl FluxQuaternion {
     }
 
     /// Wave interaction: Hamilton product + cross-term interference, normalized
+    #[allow(dead_code)]
     pub fn interact(&self, other: &Self) -> Self {
         let product = self.mul(other);
         let interference = Self::new(
@@ -93,6 +95,7 @@ impl FluxQuaternion {
     }
 
     /// Extract the 3D vector part
+    #[allow(dead_code)]
     pub fn vec3(&self) -> (f32, f32, f32) {
         (self.x, self.y, self.z)
     }

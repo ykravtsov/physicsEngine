@@ -97,46 +97,36 @@ fn update_hurricane_particles(
         let r = Vec2::new(pos.x, pos.y).length();
 
         // 1. PRESSURE GRADIENT FORCE (inward suction toward low-pressure eye)
-        // This is the primary driving force of the hurricane
         let to_center = Vec2::new(-pos.x, -pos.y);
         let pressure_force = if r > EYE_RADIUS && r < OUTER_RADIUS {
-            // Gradient strongest near eye-wall
             let gradient = PRESSURE_GRADIENT * (1.0 - r / OUTER_RADIUS) / r.max(1.0);
             to_center.normalize_or_zero() * gradient
         } else if r <= EYE_RADIUS {
-            // Eye: centrifugal balance pushes outward
             -to_center.normalize_or_zero() * 10.0
         } else {
             Vec2::ZERO
         };
 
-        // 2. CORIOLIS EFFECT as quaternion rotation around Z axis
-        // This is what converts inward suction into spiral rotation
-        // Northern Hemisphere: deflects to the right -> counter-clockwise rotation
-        let coriolis_angle = CORIOLIS_RATE * dt;
-        let cos_c = coriolis_angle.cos();
-        let sin_c = coriolis_angle.sin();
-        let coriolis_rotation = FluxQuaternion::new(cos_c, 0.0, 0.0, sin_c);
+        // 2. CORIOLIS FORCE: -2Ω × v  (velocity-dependent, NOT a fixed rotation angle)
+        // Real Coriolis scales with particle speed — fast wind deflects more than slow.
+        // In 2-D, rotating the velocity vector by 90° and scaling gives the perpendicular
+        // deflection: F_coriolis = 2Ω * |v| * v_perp_hat
+        let vel = Vec2::new(particle.flux.x, particle.flux.y);
+        let vel_speed = vel.length();
+        // Perpendicular direction (counter-clockwise deflection = Northern Hemisphere)
+        let vel_perp = Vec2::new(-vel.y, vel.x); // 90° CCW rotation of velocity
+        let coriolis_force = vel_perp * (CORIOLIS_RATE * vel_speed);
 
         // 3. DRAG FORCE (atmospheric friction)
-        let vel = Vec2::new(particle.flux.x, particle.flux.y);
         let drag_force = -vel * DRAG;
 
-        // 4. COMBINE FORCES as quaternion wave interaction
-        let force_wave = FluxQuaternion::new(
-            0.0,
-            pressure_force.x + drag_force.x,
-            pressure_force.y + drag_force.y,
-            0.0,
-        );
+        // 4. INTEGRATE all forces directly into velocity (preserves momentum/magnitude).
+        // FIX: Previously used interact() which always normalised, killing the 1/r speed
+        // profile. Now we just do plain Euler integration.
+        let total_force = pressure_force + coriolis_force + drag_force;
+        particle.flux = particle.flux.add_force(total_force.x, total_force.y, 0.0, dt);
 
-        // Apply Coriolis rotation to current flux state (this creates the spiral!)
-        particle.flux = coriolis_rotation.mul(&particle.flux);
-
-        // Interact with force wave (pressure gradient + drag)
-        particle.flux = particle.flux.interact(&force_wave);
-
-        // Scale velocity back to reasonable range
+        // Clamp speed
         let speed = Vec2::new(particle.flux.x, particle.flux.y).length();
         if speed > MAX_WIND_SPEED {
             let scale = MAX_WIND_SPEED / speed;

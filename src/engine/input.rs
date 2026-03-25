@@ -5,7 +5,6 @@ use winit::keyboard::KeyCode;
 pub struct InputState {
     pub keys_held: HashSet<KeyCode>,
     pub mouse_delta: (f32, f32),
-    pub mouse_captured: bool,
 }
 
 impl InputState {
@@ -13,7 +12,6 @@ impl InputState {
         Self {
             keys_held: HashSet::new(),
             mouse_delta: (0.0, 0.0),
-            mouse_captured: false,
         }
     }
 
