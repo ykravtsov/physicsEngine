@@ -1,7 +1,7 @@
-use bevy::prelude::*;
-use std::collections::VecDeque;
 use crate::simulation::galaxy::BlackHole;
 use crate::simulation::gpu_galaxy::PhiResource;
+use bevy::prelude::*;
+use std::collections::VecDeque;
 
 const RESONANCE_SENSITIVITY: f32 = 1000.0;
 const GOLDEN_RATIO: f32 = 1.61803398875;
@@ -43,18 +43,17 @@ pub struct CloudCentroid {
 
 impl Default for CloudCentroid {
     fn default() -> Self {
-        Self { position: Vec3::ZERO }
+        Self {
+            position: Vec3::ZERO,
+        }
     }
 }
 
-
-#[allow(dead_code)]
 fn ideal_spiral_pos(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
     Vec3::new(r * theta.cos(), 0.0, r * theta.sin())
 }
 
-#[allow(dead_code)]
 fn arm_tangent(r: f32, b: f32) -> Vec3 {
     let theta = b * r.ln();
     let dr_dtheta = r / b;
@@ -124,17 +123,23 @@ pub fn update_galaxy_physics(
                 let resonance = (-deviation * deviation * RESONANCE_SENSITIVITY).exp();
 
                 // --- Z-PINCH LOGIC ---
-                let arm_offset = if particle.arm == 0 { 0.0 } else { std::f32::consts::PI };
+                let arm_offset = if particle.arm == 0 {
+                    0.0
+                } else {
+                    std::f32::consts::PI
+                };
 
                 // We still calculate target based on current input to visualize the "attempt",
                 // but the STRENGTH of the result depends on Resonance.
-                let angle = (particle.original_radius.ln() * current_phi) + arm_offset + galaxy_angle;
+                let angle =
+                    (particle.original_radius.ln() * current_phi) + arm_offset + galaxy_angle;
 
-                let ideal_pos = black_hole_pos + Vec3::new(
-                    particle.original_radius * angle.cos(),
-                    0.0,
-                    particle.original_radius * angle.sin()
-                );
+                let ideal_pos = black_hole_pos
+                    + Vec3::new(
+                        particle.original_radius * angle.cos(),
+                        0.0,
+                        particle.original_radius * angle.sin(),
+                    );
 
                 // Apply Forces
                 let pinch_vector = ideal_pos - pos;

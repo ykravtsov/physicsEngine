@@ -1,4 +1,4 @@
-use std::ops::{Mul, Add, Sub, Neg};
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// FluxQuaternion: the core mathematical object of the vortex theory.
 /// - w = scalar pressure (ether density / energy)
@@ -21,11 +21,6 @@ impl FluxQuaternion {
 
     pub fn identity() -> Self {
         Self::new(1.0, 0.0, 0.0, 0.0)
-    }
-
-    #[allow(dead_code)]
-    pub fn zero() -> Self {
-        Self::new(0.0, 0.0, 0.0, 0.0)
     }
 
     /// Pure quaternion from a 3D vector (w=0)
@@ -68,7 +63,12 @@ impl FluxQuaternion {
         if n < 1e-8 {
             Self::identity()
         } else {
-            Self { w: self.w / n, x: self.x / n, y: self.y / n, z: self.z / n }
+            Self {
+                w: self.w / n,
+                x: self.x / n,
+                y: self.y / n,
+                z: self.z / n,
+            }
         }
     }
 
@@ -81,29 +81,15 @@ impl FluxQuaternion {
         (result.x, result.y, result.z)
     }
 
-    /// Wave interaction: Hamilton product + cross-term interference, normalized
-    #[allow(dead_code)]
-    pub fn interact(&self, other: &Self) -> Self {
-        let product = self.mul(other);
-        let interference = Self::new(
-            self.w * other.w,
-            self.x * other.y - self.y * other.x,
-            self.y * other.z - self.z * other.y,
-            self.z * other.x - self.x * other.z,
-        );
-        (product + interference).normalize()
-    }
-
-    /// Extract the 3D vector part
-    #[allow(dead_code)]
-    pub fn vec3(&self) -> (f32, f32, f32) {
-        (self.x, self.y, self.z)
-    }
-
     /// Build a 4x4 view matrix from a camera quaternion orientation and position.
     /// This is the ONLY place in the engine where we produce a matrix.
     /// The matrix is only needed for the GPU vertex shader clip-space transform.
-    pub fn to_view_matrix(orientation: &FluxQuaternion, px: f32, py: f32, pz: f32) -> [[f32; 4]; 4] {
+    pub fn to_view_matrix(
+        orientation: &FluxQuaternion,
+        px: f32,
+        py: f32,
+        pz: f32,
+    ) -> [[f32; 4]; 4] {
         // Extract basis vectors by rotating world axes with the camera quaternion
         let (rx, ry, rz) = orientation.rotate_vec3(1.0, 0.0, 0.0); // right
         let (ux, uy, uz) = orientation.rotate_vec3(0.0, 1.0, 0.0); // up
@@ -114,7 +100,12 @@ impl FluxQuaternion {
             [rx, ux, -fx, 0.0],
             [ry, uy, -fy, 0.0],
             [rz, uz, -fz, 0.0],
-            [-(rx * px + ry * py + rz * pz), -(ux * px + uy * py + uz * pz), (fx * px + fy * py + fz * pz), 1.0],
+            [
+                -(rx * px + ry * py + rz * pz),
+                -(ux * px + uy * py + uz * pz),
+                (fx * px + fy * py + fz * pz),
+                1.0,
+            ],
         ]
     }
 
@@ -146,20 +137,35 @@ impl Mul for FluxQuaternion {
 impl Add for FluxQuaternion {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        Self { w: self.w + rhs.w, x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
+        Self {
+            w: self.w + rhs.w,
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
     }
 }
 
 impl Sub for FluxQuaternion {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        Self { w: self.w - rhs.w, x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
+        Self {
+            w: self.w - rhs.w,
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
     }
 }
 
 impl Neg for FluxQuaternion {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        Self { w: -self.w, x: -self.x, y: -self.y, z: -self.z }
+        Self {
+            w: -self.w,
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
     }
 }

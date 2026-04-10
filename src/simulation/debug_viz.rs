@@ -1,7 +1,6 @@
-use bevy::prelude::*;
 use crate::simulation::galaxy::BlackHole;
+use bevy::prelude::*;
 
-#[allow(dead_code)]
 pub struct EtherVizPlugin;
 
 impl Plugin for EtherVizPlugin {
@@ -10,7 +9,6 @@ impl Plugin for EtherVizPlugin {
     }
 }
 
-#[allow(dead_code)]
 fn draw_ether_flow(mut gizmos: Gizmos, black_hole_query: Query<&Transform, With<BlackHole>>) {
     let black_hole_pos = black_hole_query.single().translation;
     const PHI_INV_4: f32 = 0.1464466094067262; // φ^{-4}
@@ -50,7 +48,8 @@ fn draw_ether_flow(mut gizmos: Gizmos, black_hole_query: Query<&Transform, With<
                 let magnitude = flow.length();
                 let max_magnitude = 10.0; // Approximate max near center
                 let min_magnitude = 0.01; // At edges
-                let t = ((magnitude - min_magnitude) / (max_magnitude - min_magnitude)).clamp(0.0, 1.0);
+                let t =
+                    ((magnitude - min_magnitude) / (max_magnitude - min_magnitude)).clamp(0.0, 1.0);
                 let shaft_color = Color::srgb(t, 0.0, 1.0 - t); // Red for high, blue for low
 
                 // Draw custom arrow

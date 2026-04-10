@@ -1,11 +1,12 @@
 mod engine;
 mod quaternion;
 mod hurricane_3d;
+mod galaxy;
 
 use engine::gpu::GpuState;
 use engine::input::InputState;
 use quaternion::camera::QuaternionCamera;
-use hurricane_3d::HurricaneSimulation;
+use galaxy::GalaxySimulation;
 
 use winit::{
     event::{Event, WindowEvent, DeviceEvent, ElementState},
@@ -23,7 +24,7 @@ async fn run() {
     let window = {
         use winit::window::Window;
         let attrs = Window::default_attributes()
-            .with_title("Quaternion Vortex Engine — Hurricane")
+            .with_title("QDM-NS Galaxy — Black Hole Through Space Fluid")
             .with_inner_size(winit::dpi::LogicalSize::new(1280u32, 720u32));
         #[allow(deprecated)]
         event_loop.create_window(attrs).expect("Failed to create window")
@@ -34,10 +35,14 @@ async fn run() {
 
     let mut gpu = GpuState::new(window).await;
     let mut input = InputState::new();
-    let mut camera = QuaternionCamera::new(0.0, 50.0, 300.0);
-    camera.move_speed = 50.0;
 
-    let mut hurricane = HurricaneSimulation::new(50000);
+    // Camera starts above the disk looking down and inward
+    let mut camera = QuaternionCamera::new(0.0, 220.0, 380.0);
+    camera.move_speed = 80.0;
+    // Tilt down to see the galaxy disk on startup
+    camera.rotate(0.0, 18.0);
+
+    let mut galaxy = GalaxySimulation::new(60_000);
     let renderer = hurricane_3d::renderer::ParticleRenderer::new(&gpu.device, &gpu.config);
 
     let mut last_time = std::time::Instant::now();
@@ -86,7 +91,7 @@ async fn run() {
                     if input.is_held(KeyCode::ShiftLeft) { camera.move_up(-speed); }
 
                     // --- PHYSICS ---
-                    hurricane.update(dt);
+                    galaxy.update(dt);
 
                     // --- RENDER ---
                     let view = camera.view_matrix();
@@ -98,7 +103,7 @@ async fn run() {
                         5000.0,
                     );
 
-                    renderer.render(&gpu, &hurricane.particles, view, proj);
+                    renderer.render(&gpu, &galaxy.particles, view, proj);
 
                     input.reset_frame();
                     window.request_redraw();

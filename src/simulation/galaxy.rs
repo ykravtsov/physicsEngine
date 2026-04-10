@@ -1,20 +1,23 @@
+use crate::physics::math::FluxQuaternion;
+use crate::simulation::plasma::update_galaxy_physics;
 use bevy::prelude::*;
 use bevy::time::{Timer, TimerMode};
-use crate::simulation::plasma::update_galaxy_physics;
-use crate::physics::math::FluxQuaternion;
 
 pub struct GalaxyPlugin;
 
 impl Plugin for GalaxyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (setup_galaxy, setup_black_hole))
-            .add_systems(Update, (
-                rotate_black_hole,
-                spawn_trail,
-                update_stars,
-                update_trail,
-                update_galaxy_physics,
-            ));
+            .add_systems(
+                Update,
+                (
+                    rotate_black_hole,
+                    spawn_trail,
+                    update_stars,
+                    update_trail,
+                    update_galaxy_physics,
+                ),
+            );
     }
 }
 
@@ -25,12 +28,9 @@ pub struct Star {
 
 #[derive(Component)]
 pub struct BlackHole {
-    #[allow(dead_code)]
     pub stored_mass: usize,
-    #[allow(dead_code)]
     pub velocity: Vec3,
 }
-
 
 #[derive(Component)]
 pub struct TrailPoint {
@@ -43,20 +43,13 @@ fn setup_galaxy(mut commands: Commands) {
         let theta = rand::random::<f32>() * std::f32::consts::TAU;
         let r = rand::random::<f32>().sqrt() * 50.0;
         let y = (rand::random::<f32>() - 0.5) * 4.0;
-        let pos = Vec3::new(
-            r * theta.cos(),
-            y,
-            r * theta.sin(),
-        );
+        let pos = Vec3::new(r * theta.cos(), y, r * theta.sin());
         let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
         let speed = 15.0;
         let velocity = tangent * speed + Vec3::new(0.0, (rand::random::<f32>() - 0.5) * 0.5, 0.0);
         // Initialize quaternion state with velocity as vector part
         let quaternion_state = FluxQuaternion::new(1.0, velocity.x, velocity.y, velocity.z);
-        commands.spawn((
-            Star { quaternion_state },
-            Transform::from_translation(pos),
-        ));
+        commands.spawn((Star { quaternion_state }, Transform::from_translation(pos)));
     }
 }
 
@@ -67,7 +60,7 @@ fn setup_black_hole(
 ) {
     let sphere_mesh = meshes.add(Sphere::new(1.0));
     let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.0, 0.0, 0.0), // Black
+        base_color: Color::srgb(0.0, 0.0, 0.0),      // Black
         emissive: Color::srgb(1.0, 1.0, 1.0).into(), // White rim glow
         ..default()
     });
@@ -88,10 +81,7 @@ fn setup_black_hole(
 
 const PHI: f32 = 1.618033988749;
 
-pub fn rotate_black_hole(
-    mut query: Query<&mut Transform, With<BlackHole>>,
-    time: Res<Time>,
-) {
+pub fn rotate_black_hole(mut query: Query<&mut Transform, With<BlackHole>>, time: Res<Time>) {
     let dt = time.delta_seconds();
     for mut transform in query.iter_mut() {
         transform.rotate_y(PHI * dt * 0.1);
@@ -181,9 +171,9 @@ fn update_stars(
         let rot_y = FluxQuaternion::new(cos_a, 0.0, sin_a, 0.0);
 
         // FIX 3: Apply gravity as a direct velocity integration (preserves momentum).
-        star.quaternion_state = star.quaternion_state.add_force(
-            grav_accel.x, grav_accel.y, grav_accel.z, dt,
-        );
+        star.quaternion_state =
+            star.quaternion_state
+                .add_force(grav_accel.x, grav_accel.y, grav_accel.z, dt);
 
         // Apply differential rotation to the velocity vector.
         star.quaternion_state = rot_y.mul(&star.quaternion_state);
@@ -219,7 +209,8 @@ fn update_stars(
                 (rand::random::<f32>() - 0.5) * 4.0,
                 spawn_r * theta.sin(),
             );
-            let tangent = Vec3::new(-transform.translation.z, 0.0, transform.translation.x).normalize();
+            let tangent =
+                Vec3::new(-transform.translation.z, 0.0, transform.translation.x).normalize();
             let v = tangent * (gm / spawn_r).sqrt();
             star.quaternion_state = FluxQuaternion::new(1.0, v.x, v.y, v.z);
         }

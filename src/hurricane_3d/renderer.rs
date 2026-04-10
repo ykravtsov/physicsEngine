@@ -1,7 +1,7 @@
-use wgpu::*;
-use bytemuck::{Pod, Zeroable};
-use crate::engine::gpu::GpuState;
 use super::Particle;
+use crate::engine::gpu::GpuState;
+use bytemuck::{Pod, Zeroable};
+use wgpu::*;
 
 /// GPU vertex for a single particle
 #[repr(C)]
@@ -41,19 +41,20 @@ impl ParticleRenderer {
             mapped_at_creation: false,
         });
 
-        let camera_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("Camera BGL"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("Camera BGL"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
 
         let camera_bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Camera BG"),
@@ -75,7 +76,13 @@ impl ParticleRenderer {
         // Shader
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Particle Shader"),
-            source: ShaderSource::Wgsl(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/shaders/particle3d.wgsl")).into()),
+            source: ShaderSource::Wgsl(
+                include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/assets/shaders/particle3d.wgsl"
+                ))
+                .into(),
+            ),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -94,9 +101,21 @@ impl ParticleRenderer {
                     array_stride: std::mem::size_of::<ParticleVertex>() as u64,
                     step_mode: VertexStepMode::Vertex,
                     attributes: &[
-                        VertexAttribute { offset: 0, shader_location: 0, format: VertexFormat::Float32x3 },
-                        VertexAttribute { offset: 12, shader_location: 1, format: VertexFormat::Float32x4 },
-                        VertexAttribute { offset: 28, shader_location: 2, format: VertexFormat::Float32 },
+                        VertexAttribute {
+                            offset: 0,
+                            shader_location: 0,
+                            format: VertexFormat::Float32x3,
+                        },
+                        VertexAttribute {
+                            offset: 12,
+                            shader_location: 1,
+                            format: VertexFormat::Float32x4,
+                        },
+                        VertexAttribute {
+                            offset: 28,
+                            shader_location: 2,
+                            format: VertexFormat::Float32,
+                        },
                     ],
                 }],
                 compilation_options: Default::default(),
@@ -150,27 +169,36 @@ impl ParticleRenderer {
             proj,
             camera_pos: [0.0; 4],
         };
-        gpu.queue.write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
+        gpu.queue
+            .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
 
         // Upload particle vertices
         let count = particles.len().min(self.max_particles);
-        let vertices: Vec<ParticleVertex> = particles[..count].iter().map(|p| ParticleVertex {
-            position: [p.x, p.y, p.z],
-            color: [p.r, p.g, p.b, p.a],
-            size: p.size,
-        }).collect();
-        gpu.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
+        let vertices: Vec<ParticleVertex> = particles[..count]
+            .iter()
+            .map(|p| ParticleVertex {
+                position: [p.x, p.y, p.z],
+                color: [p.r, p.g, p.b, p.a],
+                size: p.size,
+            })
+            .collect();
+        gpu.queue
+            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
 
         // Render
         let output = match gpu.surface.get_current_texture() {
             Ok(t) => t,
             Err(_) => return,
         };
-        let view_tex = output.texture.create_view(&TextureViewDescriptor::default());
+        let view_tex = output
+            .texture
+            .create_view(&TextureViewDescriptor::default());
 
-        let mut encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -179,7 +207,12 @@ impl ParticleRenderer {
                     view: &view_tex,
                     resolve_target: None,
                     ops: Operations {
-                        load: LoadOp::Clear(Color { r: 0.0, g: 0.0, b: 0.02, a: 1.0 }),
+                        load: LoadOp::Clear(Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.02,
+                            a: 1.0,
+                        }),
                         store: StoreOp::Store,
                     },
                 })],

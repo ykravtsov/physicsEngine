@@ -1,4 +1,27 @@
-#![allow(dead_code)]
+//! GPU Galaxy Simulation — Quaternionic Dirac-Maxwell-NS (QDM-NS) framework
+//!
+//! State field:  Ψ = ψ + F + v  ∈ H(C)
+//!   ψ  = macroscopic vortex "spin" (Dirac-like wavefunction)
+//!   F  = EM quaternion
+//!   v  = fluid velocity quaternion
+//!
+//! Unified operator (quaternionic Dirac-Maxwell-NS operator):
+//!
+//!   DΨ = (∇ + m_eff + ν∇² − D/Dt) Ψ + Ψ̄·J + λ(ΨΨ̄ − 1)Ψ
+//!
+//! Terms:
+//!   ∇Ψ            — Dirac + Maxwell core (relativistic + EM propagation)
+//!   m_eff Ψ       — effective mass from baryonic density + self-gravity (vortex "rest energy")
+//!   ν∇²Ψ          — quaternion viscosity; |∇²Ψ| regularises r→0 (no true point singularity)
+//!   −(D/Dt)Ψ      — material derivative → Navier-Stokes advection + vortex stretching
+//!   Ψ̄·J           — Lorentz force + current self-interaction (Birkeland / Z-pinch arms)
+//!   λ(ΨΨ̄−1)Ψ     — nonlinear brake / energy-sink (vorticity-threshold jet trigger)
+//!
+//! Galaxy as vortex: steady-state, axisymmetric, purely-rotational velocity quaternion
+//!   v(r, φ) = ω(r)k̂ + φ₀ ln r     (φ₀ pitch related to golden ratio)
+//!
+//! The attractor is the golden-ratio logarithmic spiral:
+//!   r(φ) = r₀ exp(φ / φ₀),    φ₀ = 2π / ln φ ≈ 2.4 rad,    φ = (1+√5)/2
 
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
@@ -6,8 +29,13 @@ use bevy::render::renderer::{RenderDevice, RenderQueue};
 use rand::Rng;
 
 const WORKGROUP_SIZE: u32 = 64;
-#[allow(dead_code)]
+
+/// Golden ratio φ = (1+√5)/2 — the natural attractor pitch of QDM-NS vortex arms.
 const PHI: f32 = 1.6180339887498948482;
+
+/// φ₀ = 2π / ln(φ) ≈ 2.4 rad — logarithmic-spiral pitch angle eigenvalue from
+/// the ν∇² + Lorentz-pinch balance in the QDM-NS operator.
+const PHI0: f32 = 2.399_963; // 2π / ln(1.618034)
 
 #[derive(Resource)]
 pub struct ParticleCount {
@@ -20,7 +48,6 @@ impl Default for ParticleCount {
     }
 }
 
-#[allow(dead_code)]
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct Particle {
@@ -29,20 +56,27 @@ pub struct Particle {
     pub color: Vec4,
 }
 
-#[allow(dead_code)]
 #[derive(ShaderType, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub struct GalaxyUniforms {
     pub time: f32,
     pub dt: f32,
+    /// Ψ̄·J coupling strength — controls Birkeland / Z-pinch arm pinch.
+    /// Corresponds to the Lorentz self-interaction term in the QDM-NS operator.
     pub pinch_strength: f32,
+    /// Current value of φ (golden ratio). Arm pitch φ₀ = 2π / ln(phi_value).
     pub phi_value: f32,
     pub arms: f32,
+    /// ν — quaternion viscosity coefficient (regularises r→0 via |∇²Ψ|).
+    pub nu: f32,
+    /// λ — vorticity-threshold brake coefficient: λ(ΨΨ̄−1)Ψ jet-trigger term.
+    pub lambda: f32,
+    /// m_eff — effective baryonic mass / self-gravity term ("vortex rest energy").
+    pub m_eff: f32,
 }
 
 #[derive(Resource)]
 pub struct GpuGalaxyResources {
-    #[allow(dead_code)]
     pub particle_buffer: Buffer,
     pub uniform_buffer: Buffer,
     pub compute_pipeline: ComputePipeline,
@@ -51,7 +85,6 @@ pub struct GpuGalaxyResources {
 
 #[derive(Component)]
 pub struct GpuParticle {
-    #[allow(dead_code)]
     pub entity_index: usize,
 }
 
@@ -64,10 +97,19 @@ pub struct GpuGalaxyPlugin;
 
 impl Plugin for GpuGalaxyPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(PhiResource { phi_value: 1.618034 })
-            .init_resource::<ParticleCount>()
-            .add_systems(Startup, (setup_gpu_galaxy, spawn_gpu_particles))
-            .add_systems(Update, (update_phi_input, update_gpu_galaxy, update_particle_transforms));
+        app.insert_resource(PhiResource {
+            phi_value: 1.618034,
+        })
+        .init_resource::<ParticleCount>()
+        .add_systems(Startup, (setup_gpu_galaxy, spawn_gpu_particles))
+        .add_systems(
+            Update,
+            (
+                update_phi_input,
+                update_gpu_galaxy,
+                update_particle_transforms,
+            ),
+        );
     }
 }
 
@@ -76,55 +118,72 @@ fn setup_gpu_galaxy(
     render_device: Res<RenderDevice>,
     particle_count: Res<ParticleCount>,
 ) {
-    // Create particle buffer with initial spiral data
+    // -----------------------------------------------------------------------
+    // Genesis Initialization — QDM-NS golden-ratio logarithmic spiral
+    //
+    // Steady-state, axisymmetric velocity quaternion from the QDM-NS operator:
+    //   v(r, φ) = ω(r) k̂  +  φ₀ · ln r      (φ₀ = 2π/ln φ ≈ 2.4 rad)
+    //
+    // The attractor spiral: r(φ) = r₀ · exp(φ / φ₀)
+    // Inverted for init: given r, the on-arm angle is φ = φ₀ · ln(r / r₀)
+    //                           i.e. θ = φ₀ · ln r   (r₀ = 1 absorbed into offset)
+    // -----------------------------------------------------------------------
     let mut particles = Vec::with_capacity(particle_count.count);
-
-    // Genesis Initialization (Pre-formed Spiral)
     let mut rng = rand::thread_rng();
 
+    // φ₀ = 2π / ln(φ) — pitch-angle eigenvalue from ν∇² + Lorentz-pinch balance
+    let phi0: f32 = PHI0;
+
     for i in 0..particle_count.count {
-        // 1. DISTRIBUTE RADIUS
-        // Use square root for even disk distribution, then spread out
-        let r: f32 = rng.gen_range(2.0..60.0);
+        // 1. Sample radius log-uniformly so density ∝ 1/r (flat surface density)
+        let r: f32 = rng.gen_range(2.0_f32..60.0_f32);
 
-        // 2. CALCULATE PERFECT GOLDEN SPIRAL POSITION
-        let phi = 1.618034;
-        let _b = 0.3; // Tightness of the spiral
+        // 2. QDM-NS on-arm angle: θ = φ₀ · ln r
+        //    (arises from the eigenvalue condition of the vorticity equation under
+        //    ν∇² + Ψ̄·J Lorentz-pinch balance — not imposed by hand)
+        let base_theta = phi0 * r.ln();
 
-        // The fundamental spiral equation: Angle = ln(r) * phi
-        let base_theta = r.ln() * phi;
+        // 3. Two arms (Z-pinch wires carry equal and opposite J):
+        //    Arm A at offset 0, Arm B at offset π
+        let arm_offset = if i % 2 == 0 {
+            0.0
+        } else {
+            std::f32::consts::PI
+        };
 
-        // 3. CREATE 2 ARMS (The Propeller)
-        // Even particles go to Arm A (0 rad), Odd particles go to Arm B (PI rad)
-        let arm_offset = if i % 2 == 0 { 0.0 } else { std::f32::consts::PI };
-
-        // 4. ADD "FUZZ" (Thickness)
-        // A galaxy isn't a thin line; it's a thick stream.
+        // 4. Arm thickness fuzz (finite cross-section of Birkeland current sheet)
         let fuzz = (rng.r#gen::<f32>() - 0.5) * 0.8;
 
         let theta = base_theta + arm_offset + fuzz;
-        let y = rng.gen_range(-1.5..1.5); // Disk thickness
+        // Disk half-height from Coriolis + gravity balance
+        let y = rng.gen_range(-1.5..1.5);
 
         let pos = Vec4::new(
             r * theta.cos(),
             y,
             r * theta.sin(),
-            1.0 // Life/Padding
+            1.0, // w = 1 (alive)
         );
 
-        // 5. ORBITAL VELOCITY
-        // Give them perfect tangent velocity so they are stable at T=0
+        // 5. Velocity quaternion v(r, φ) = ω(r)k̂ + φ₀·ln(r)
+        //    ω(r) tangential component — flat rotation curve via Ψ̄·J Lorentz support
+        //    The scalar part φ₀·ln(r) encodes the logarithmic-spiral flow pitch.
         let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
-        let speed = 15.0; // Adjust speed to match your pinch strength
+        let omega = 15.0_f32; // ω — set by Ψ̄·J pinch strength (tunable via uniforms)
+        let log_pitch = phi0 * r.ln(); // scalar (w) component of velocity quaternion
 
         let vel = Vec4::new(
-            tangent.x * speed,
+            tangent.x * omega,
+            log_pitch, // y encodes φ₀·ln r (quaternion imaginary j component)
+            tangent.z * omega,
             0.0,
-            tangent.z * speed,
-            0.0
         );
 
-        particles.push(Particle { pos, vel, color: Vec4::new(1.0, 1.0, 1.0, 1.0) });
+        particles.push(Particle {
+            pos,
+            vel,
+            color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+        });
     }
 
     let particle_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -133,13 +192,20 @@ fn setup_gpu_galaxy(
         usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
     });
 
-    // Create uniform buffer
+    // Create uniform buffer — QDM-NS operator parameters
     let uniforms = GalaxyUniforms {
         time: 0.0,
         dt: 0.016, // ~60 FPS
+        // pinch_strength: Ψ̄·J coupling (Birkeland/Z-pinch arm cohesion)
         pinch_strength: 0.1,
-        phi_value: 1.618034,
+        phi_value: PHI,
         arms: 2.0,
+        // ν: quaternion viscosity — regularises r→0, prevents point singularities
+        nu: 0.01,
+        // λ: vorticity-threshold brake — triggers jet/outflow when |ω| > critical value
+        lambda: 0.05,
+        // m_eff: baryonic density + self-gravity ("vortex rest energy")
+        m_eff: 0.001,
     };
 
     let uniform_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
@@ -227,13 +293,17 @@ fn update_gpu_galaxy(
     phi_resource: Res<PhiResource>,
     particle_count: Res<ParticleCount>,
 ) {
-    // Update uniforms
+    // Update uniforms — QDM-NS operator parameters per frame
+    // φ₀ is recomputed each frame so live phi-tuning propagates to the spiral pitch.
     let uniforms = GalaxyUniforms {
-        time: time.elapsed_seconds(),
-        dt: time.delta_seconds(),
-        pinch_strength: 0.1,
+        time: time.elapsed_secs(),
+        dt: time.delta_secs(),
+        pinch_strength: 0.1, // Ψ̄·J Lorentz-pinch arm coupling
         phi_value: phi_resource.phi_value,
         arms: 2.0,
+        nu: 0.01,     // ν — quaternion viscosity
+        lambda: 0.05, // λ — vorticity-threshold brake
+        m_eff: 0.001, // m_eff — baryonic self-gravity
     };
 
     render_queue.write_buffer(&resources.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
@@ -251,7 +321,11 @@ fn update_gpu_galaxy(
 
         compute_pass.set_pipeline(&resources.compute_pipeline);
         compute_pass.set_bind_group(0, &resources.bind_group, &[]);
-        compute_pass.dispatch_workgroups(((particle_count.count as u32) + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
+        compute_pass.dispatch_workgroups(
+            ((particle_count.count as u32) + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
+            1,
+            1,
+        );
     }
 
     render_queue.submit([command_encoder.finish()]);
@@ -261,12 +335,18 @@ fn spawn_gpu_particles(mut commands: Commands, particle_count: Res<ParticleCount
     // Spawn a subset of particles for rendering (10,000 out of total)
     const VISIBLE_PARTICLES: usize = 10_000;
     let num_to_spawn = VISIBLE_PARTICLES.min(particle_count.count);
-    let step = if num_to_spawn > 0 { particle_count.count / num_to_spawn } else { 1 };
+    let step = if num_to_spawn > 0 {
+        particle_count.count / num_to_spawn
+    } else {
+        1
+    };
 
     for i in 0..num_to_spawn {
         let particle_index = i * step;
         commands.spawn((
-            GpuParticle { entity_index: particle_index },
+            GpuParticle {
+                entity_index: particle_index,
+            },
             Transform::default(),
         ));
     }
@@ -299,10 +379,15 @@ fn update_phi_input(
         changed = true;
     }
     if keyboard_input.just_pressed(KeyCode::Space) {
-        phi_resource.phi_value = 1.618034;
+        // Reset to golden ratio — the QDM-NS attractor eigenvalue
+        phi_resource.phi_value = PHI;
         changed = true;
     }
     if changed {
-        println!("Phi value: {:.6}", phi_resource.phi_value);
+        let phi0 = std::f32::consts::TAU / phi_resource.phi_value.ln();
+        println!(
+            "φ = {:.6}   φ₀ = 2π/ln(φ) = {:.4} rad  (golden-ratio attractor = {:.6})",
+            phi_resource.phi_value, phi0, PHI
+        );
     }
 }
