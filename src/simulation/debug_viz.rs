@@ -11,7 +11,7 @@ impl Plugin for EtherVizPlugin {
 
 fn draw_ether_flow(mut gizmos: Gizmos, black_hole_query: Query<&Transform, With<BlackHole>>) {
     let black_hole_pos = black_hole_query.single().translation;
-    const PHI_INV_4: f32 = 0.1464466094067262; // φ^{-4}
+    const PHI_INV_4: f32 = 0.145_898_03; // φ^{-4} = 1/φ⁴ (was 0.14644661 = sin²(π/8))
     let cos_mu = PHI_INV_4.cos();
     let sin_mu = PHI_INV_4.sin();
 

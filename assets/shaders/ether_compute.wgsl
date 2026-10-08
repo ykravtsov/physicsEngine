@@ -8,7 +8,8 @@
 @group(1) @binding(1) var<uniform> dt: f32;
 @group(1) @binding(2) var<uniform> center_sink: vec3<f32>; // position of central sink
 
-const PHI_INV_4: f32 = 0.146446609406726237799577818947237528;
+// φ^{-4} = 1/φ⁴ ≈ 0.1458980 (previous value 0.1464466 was sin²(π/8), not φ^{-4})
+const PHI_INV_4: f32 = 0.145898033750315455;
 
 fn sample(pos: vec3<i32>) -> vec4<f32> {
     let clamped = clamp(pos, vec3<i32>(0), vec3<i32>(grid_size) - 1);

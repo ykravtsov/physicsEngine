@@ -17,7 +17,8 @@ struct GalaxyUniforms {
     dt:             f32,
     // Ψ̄·J coupling — Birkeland / Z-pinch arm cohesion
     pinch_strength: f32,
-    // φ — golden ratio (tunable). Arm pitch φ₀ = 2π / ln(φ).
+    // φ — golden ratio (tunable). Arm winding coefficient φ₀ = 2π / ln(φ)
+    // (≈ 13.06 rad at φ = 1.618; pitch angle atan(1/φ₀) ≈ 4.38°).
     phi_value:      f32,
     arms:           f32,
     // ν — quaternion viscosity; regularises r→0 via |∇²Ψ|
@@ -97,7 +98,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // -----------------------------------------------------------------------
     let psi = vec4<f32>(particle.vel.w, particle.vel.x, particle.vel.y, particle.vel.z);
 
-    // φ₀ = 2π / ln(φ) — the spiral pitch eigenvalue
+    // φ₀ = 2π / ln(φ) ≈ 13.06 rad — spiral winding coefficient (θ_arm = φ₀·ln r).
+    // NOTE: gpu_galaxy.rs initialises particles with 2π/φ² ≈ 2.40 instead.
     let phi0 = 6.283185 / log(max(uniforms.phi_value, 1.0001));
 
     let current_theta = atan2(pos.z, pos.x);
