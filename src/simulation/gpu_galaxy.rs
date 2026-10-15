@@ -170,23 +170,20 @@ fn setup_gpu_galaxy(
             1.0, // w = 1 (alive)
         );
 
-        // 5. Velocity quaternion v(r, φ) = ω(r)k̂ + φ₀·ln(r)
-        //    ω(r) tangential component — flat rotation curve via Ψ̄·J Lorentz support
-        //    The scalar part φ₀·ln(r) encodes the logarithmic-spiral flow pitch.
+        // 5. Velocity. A flat tangential speed is an initial condition here
+        //    (nothing in the shader supplies the centripetal acceleration that
+        //    would keep it). φ₀·ln r is the arm's azimuth, not a linear speed:
+        //    storing it in vel.y launched particles out of the disk at several
+        //    code-units per second. A log-spiral streamline is a small inward
+        //    radial velocity, with pitch atan(1/φ₀). See THEORY.md §3.2 and §4.
         let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
-        let omega = 15.0_f32; // ω — set by Ψ̄·J pinch strength (tunable via uniforms)
-        let log_pitch = phi0 * r.ln();
-        // TODO: README describes φ₀·ln r as the *scalar* part of the velocity
-        // quaternion, but here it is stored in vel.y, i.e. the vertical (out-of-disk)
-        // velocity, because the disk lies in the x–z plane. (vel.w is the pressure
-        // slot and is overwritten by the shader each step.) Also, `omega` is used
-        // as a tangential *speed*, not an angular velocity. The intended behaviour
-        // is ambiguous, so it is left unchanged; see THEORY.md §3.2 and §4.
-
+        let radial = Vec3::new(pos.x, 0.0, pos.z).normalize();
+        let omega = 15.0_f32; // tangential speed, not an angular velocity
+        let inflow = -omega * (1.0 / phi0) * 0.15;
         let vel = Vec4::new(
-            tangent.x * omega,
-            log_pitch, // y encodes φ₀·ln r (quaternion imaginary j component)
-            tangent.z * omega,
+            tangent.x * omega + radial.x * inflow,
+            (rng.r#gen::<f32>() - 0.5) * 0.4,
+            tangent.z * omega + radial.z * inflow,
             0.0,
         );
 
