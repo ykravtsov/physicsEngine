@@ -1,0 +1,4 @@
+# downloaded inputs (see fetch_data.sh) and regenerated plots
+data/
+*.png
+__pycache__/
