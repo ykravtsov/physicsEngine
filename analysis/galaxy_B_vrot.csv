@@ -1,0 +1,37 @@
+galaxy,B_total_uG,B_err_plus_uG,B_source,sample,v_flat_kms,v_source,SFR_Msun_yr,R25_kpc,SigmaSFR_Msun_yr_kpc2,mass_discrepancy_Vobs2_over_Vbar2_outer,R_outer_kpc,SPARC_MHI_1e9Msun,SPARC_RHI_kpc,md_source
+IC2574,4.0,0.9,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),66.4,SPARC Lelli+2016 Vflat,0.057,7.28,0.00034,4.44,10.23,1.036,10.81,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC337,14.3,1.8,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),138.14,HyperLeda vrot (incl 51 deg),1.3,8.14,0.00624,,,,,
+NGC628,8.5,1.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,0.68,11.0,0.00179,,,,,
+NGC1266,18.2,4.7,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,,6.68,,,,,,
+NGC2146,27.3,7.8,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,7.94,15.01,0.01122,,,,,
+NGC2798,19.1,5.2,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),154.43,HyperLeda vrot (incl 85 deg),3.38,9.76,0.0113,,,,,
+NGC2841,15.0,2.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),284.8,SPARC Lelli+2016 Vflat,2.45,16.61,0.00283,7.33,63.64,9.775,45.12,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC2976,6.7,1.3,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),85.4,SPARC Lelli+2016 Vflat,0.082,3.05,0.00281,2.02,2.27,0.172,3.04,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC3049,8.8,2.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),106.82,HyperLeda vrot (incl 58 deg),0.61,6.14,0.00514,,,,,
+NGC3184,8.7,3.4,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,0.66,12.59,0.00132,,,,,
+NGC3190,13.5,2.6,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),215.01,HyperLeda vrot (incl 88 deg),0.38,12.35,0.00079,,,,,
+NGC3265,8.2,2.2,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),95.11,HyperLeda vrot (incl 65 deg),0.38,3.71,0.00881,,,,,
+NGC3521,19.6,2.3,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),213.7,SPARC Lelli+2016 Vflat,1.95,17.92,0.00193,3.36,17.74,4.154,18.85,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC3627,16.1,5.4,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),174.7,HyperLeda vrot (incl 68 deg),1.7,12.41,0.00351,,,,,
+NGC3938,9.1,2.2,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,1.77,14.06,0.00285,,,,,
+NGC4254,16.5,2.1,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,3.92,11.31,0.00976,,,,,
+NGC4321,13.3,1.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,2.61,15.39,0.00351,,,,,
+NGC4536,17.3,1.4,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),155.66,HyperLeda vrot (incl 73 deg),2.17,16.03,0.00269,,,,,
+NGC4559,9.3,0.8,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),121.2,SPARC Lelli+2016 Vflat,0.37,10.86,0.001,2.95,20.97,5.811,21.16,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC4569,11.7,4.9,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),185.8,HyperLeda vrot (incl 71 deg),0.29,13.62,0.0005,,,,,
+NGC4631,24.7,3.0,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),138.49,HyperLeda vrot (incl 90 deg),1.7,17.18,0.00183,,,,,
+NGC4725,10.2,1.9,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),257.27,HyperLeda vrot (incl 45 deg),0.44,18.52,0.00041,,,,,
+NGC4736,8.9,1.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),178,Tabatabaei+2016 Table 1 (flat part of RC),0.38,7.59,0.0021,,,,,
+NGC4826,8.7,2.2,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),152.12,HyperLeda vrot (incl 64 deg),0.26,7.66,0.00141,,,,,
+NGC5055,14.1,2.0,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),179.0,SPARC Lelli+2016 Vflat,1.04,14.55,0.00156,3.83,54.59,11.722,35.06,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC5457,12.9,1.2,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,2.33,28.06,0.00094,,,,,
+NGC5713,16.4,3.0,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),107.95,HyperLeda vrot (incl 48 deg),2.52,8.72,0.01056,,,,,
+NGC5866,11.1,6.0,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,0.26,10.46,0.00076,,,,,
+NGC6946,16.0,2.4,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),158.9,SPARC Lelli+2016 Vflat,7.12,11.37,0.01752,2.67,20.4,5.67,21.25,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+NGC7331,23.6,2.3,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),239.0,SPARC Lelli+2016 Vflat,2.74,22.14,0.00178,3.08,36.31,11.067,27.01,"SPARC mass models (Y_disk=0.5,Y_bul=0.7)"
+M51,15.5,3.5,Tabatabaei+2017 ApJ 836 185 Table 5/6,primary (homogeneous),,,5.0,12.38,0.01038,,,,,
+M31,6.6,0.3,Tabatabaei+2013 A&A 557 A129 Table 3 (R=30-50 arcmin ring),supplementary (different method),229,Tabatabaei+2016 Table 1 (flat part of RC),,,,,,,,
+M33,8.1,0.5,Tabatabaei+2013 A&A 557 A129 Table 3,supplementary (different method),120,Tabatabaei+2016 Table 1 (flat part of RC),,,,,,,,
+LMC,4.2,,Tabatabaei+2013 Table 3 (from Gaensler+2005),supplementary (different method),69,Tabatabaei+2016 Table 1 (flat part of RC),,,,,,,,
+NGC1097,9.0,2.0,Basu & Roy 2013 MNRAS 433 1675 Table 4,supplementary (different method),295,Tabatabaei+2016 Table 1 (flat part of RC),,,,,,,,
+NGC5236,12.2,2.5,Basu & Roy 2013 MNRAS 433 1675 Table 4,supplementary (different method),,,,,,,,,,

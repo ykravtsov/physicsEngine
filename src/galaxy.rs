@@ -13,15 +13,21 @@ use rand::Rng;
 
 // ── physical constants ─────────────────────────────────────────────────────
 
-/// φ₀ = 2π/ln(φ) ≈ 2.4 rad — spiral pitch eigenvalue
-const PHI0: f32 = 2.399_963;
+/// Arm winding coefficient b in the logarithmic spiral θ = b·ln r  (r = r₀·e^(θ/b)).
+/// The value is the golden angle 2π/φ² ≈ 2.39996 rad (137.5°), NOT 2π/ln φ (≈ 13.06 rad).
+/// With b = 2π/φ² the radius grows by e^(φ²) ≈ 13.7× per full turn and the
+/// pitch angle is atan(1/b) ≈ 22.6°. For comparison:
+///   - growth by φ per full turn:    b = 2π/ln φ    ≈ 13.06, pitch = atan(ln φ/2π)  ≈ 4.38°
+///   - growth by φ per quarter turn: b = π/(2 ln φ) ≈ 3.26,  pitch = atan(2 ln φ/π) ≈ 17.03°
+///     (the classic "golden spiral")
+const GOLDEN_ANGLE: f32 = 2.399_963;
 
-/// Gravitational constant of the galactic core (Plummer sphere)
+/// Gravitational parameter GM of the galactic core (Plummer sphere), code units
 const GM_CORE: f32 = 4_000.0;
 /// Plummer softening radius ε for the core
 const EPS_CORE: f32 = 8.0;
 
-/// Gravitational constant of the wandering black hole
+/// Gravitational parameter GM of the wandering black hole, code units
 const GM_BH: f32 = 360.0;
 /// Plummer softening radius ε for the BH (large → very gentle tides)
 const EPS_BH: f32 = 20.0;
@@ -58,8 +64,8 @@ fn plummer_circular_speed(r: f32, gm: f32, eps: f32) -> f32 {
     (gm * r2 / denom).sqrt()
 }
 
-/// Plummer acceleration magnitude: a = GM / (r² + ε²)
-/// Returns the scalar factor; caller multiplies by displacement vector.
+/// Plummer acceleration factor GM / (r² + ε²)^(3/2).
+/// Caller multiplies by the displacement vector, so |a| = GM·r / (r² + ε²)^(3/2).
 fn plummer_accel_factor(r_sq: f32, gm: f32, eps: f32) -> f32 {
     gm / (r_sq + eps * eps).powf(1.5)
 }
@@ -103,7 +109,7 @@ impl GalaxySimulation {
                     std::f32::consts::PI
                 };
                 let fuzz = (rng.r#gen::<f32>() - 0.5) * 0.7;
-                PHI0 * r.ln() + arm_offset + fuzz
+                GOLDEN_ANGLE * r.ln() + arm_offset + fuzz
             } else {
                 // Background disk: fully random angle fills inter-arm voids
                 rng.r#gen::<f32>() * std::f32::consts::TAU
@@ -155,7 +161,7 @@ impl GalaxySimulation {
         // in a low-density void and gradually sweeps into the arm — this
         // prevents the initial burst of thousands of interactions.
         let bh_r: f32 = 120.0;
-        let bh_theta = PHI0 * bh_r.ln() + std::f32::consts::FRAC_PI_2; // mid inter-arm
+        let bh_theta = GOLDEN_ANGLE * bh_r.ln() + std::f32::consts::FRAC_PI_2; // mid inter-arm
         let bh_vc = plummer_circular_speed(bh_r, GM_CORE, EPS_CORE) * 0.90;
         let bh_cos = bh_theta.cos();
         let bh_sin = bh_theta.sin();
@@ -189,7 +195,7 @@ impl GalaxySimulation {
         }
         self.frame += 1;
 
-        // ── Diagnostic output every 120 frames (~2 s at 60 fps) ────────────
+        // ── Diagnostic output every 300 frames (~5 s at 60 fps) ────────────
         if self.frame % 300 == 0 {
             self.print_diagnostics(dt);
         }
@@ -340,7 +346,7 @@ impl GalaxySimulation {
 
             // ── 5. ∇Ψ arm-restoring force (Ψ̄·J Lorentz pinch) ─────────────
             // Pushes particle tangentially toward the golden-spiral arm
-            let theta_arm = PHI0 * r_xz.ln();
+            let theta_arm = GOLDEN_ANGLE * r_xz.ln();
             let phase = p.z.atan2(p.x) - theta_arm;
             let spd_now = (p.flux.x * p.flux.x + p.flux.z * p.flux.z).sqrt().max(1.0);
             let pinch = phase.sin() * spd_now * PINCH;
@@ -348,7 +354,7 @@ impl GalaxySimulation {
             let az = az - tz * pinch;
 
             // ── 6. Integrate velocity ──────────────────────────────────────
-            // Gentle system-wide damping (0.3 %/s) prevents slow energy drift
+            // Gentle system-wide damping (6 %/s) prevents slow energy drift
             // where particles gradually spiral outward from BH interactions.
             let damp = 1.0 - 0.06 * dt;
             p.flux.x = p.flux.x * damp + ax * dt;
@@ -415,7 +421,7 @@ impl GalaxySimulation {
                 } else {
                     std::f32::consts::PI
                 };
-                let st = PHI0 * sr.ln() + ao + (rng.r#gen::<f32>() - 0.5) * 0.8;
+                let st = GOLDEN_ANGLE * sr.ln() + ao + (rng.r#gen::<f32>() - 0.5) * 0.8;
                 p.x = sr * st.cos();
                 p.y = (rng.r#gen::<f32>() - 0.5) * DISK_THICKNESS;
                 p.z = sr * st.sin();

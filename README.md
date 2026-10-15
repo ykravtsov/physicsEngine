@@ -2,6 +2,8 @@
 
 A custom 3D physics engine built from scratch in Rust using **pure quaternion mathematics** — no matrix transforms (except the final GPU projection). This engine implements the **Quaternionic Dirac-Maxwell-NS (QDM-NS)** unified vortex field theory: a single quaternion operator that unifies Navier-Stokes fluid dynamics, Maxwell electromagnetism, and Dirac-like spin into one closed, self-consistent framework.
 
+📐 For a symbol-by-symbol write-up of the equations, units, open questions and observational checks, see [THEORY.md](THEORY.md).
+
 ## 🌀 What You See
 
 A life-like 3D hurricane simulation with 50,000 particles you can fly through:
@@ -124,10 +126,12 @@ $$
 Plugging into the unified equation and linearising for small perturbations, the vorticity equation reduces to a self-similar logarithmic spiral whose pitch angle satisfies the eigenvalue condition from the $\nu\nabla^2$ + Lorentz-pinch balance. The exact attractor solution is the **golden-ratio logarithmic spiral**:
 
 $$
-r(\phi) = r_0 \exp\!\left(\frac{\phi}{\phi_0}\right), \qquad
-\phi_0 = \frac{2\pi}{\ln\varphi} \approx 2.4\,\text{rad}, \qquad
+r(\theta) = r_0 \exp\!\left(\frac{\theta}{\phi_0}\right), \qquad
+\phi_0 = \frac{2\pi}{\varphi^2} \approx 2.400\,\text{rad}\ \text{(the golden angle)}, \qquad
 \varphi = \frac{1+\sqrt{5}}{2}
 $$
+
+Here $\theta$ is the azimuthal angle and $\phi_0$ is the arm winding coefficient ($\theta_{\text{arm}} = \phi_0 \ln r$), as used in `src/galaxy.rs` (`GOLDEN_ANGLE`). The pitch angle is $\arctan(1/\phi_0) \approx 22.6^\circ$. For reference, other "golden" conventions give different spirals: growth by $\varphi$ per full turn means $\phi_0 = 2\pi/\ln\varphi \approx 13.06$ rad (pitch $\arctan(\ln\varphi/2\pi) \approx 4.38^\circ$, used by `assets/shaders/galaxy_sim.wgsl`), and the classic golden spiral (growth by $\varphi$ per quarter turn) has $\phi_0 = \pi/(2\ln\varphi) \approx 3.26$ (pitch $\arctan(2\ln\varphi/\pi) \approx 17.03^\circ$).
 
 This is **not** forced — it is the attractor of the nonlinear vortex + EM-wire system. Arm spacing and winding are fixed by the golden ratio because it is the continued-fraction optimum for self-similar vorticity transport.
 
@@ -136,7 +140,7 @@ This is **not** forced — it is the attractor of the nonlinear vortex + EM-wire
 | Symbol | Code field | Physical role |
 |--------|-----------|---------------|
 | $\varphi$ | `phi_value` | Golden ratio (tunable via ←/→ keys) |
-| $\phi_0 = 2\pi/\ln\varphi$ | `PHI0` | Spiral pitch eigenvalue |
+| $\phi_0 = 2\pi/\varphi^2$ | `GOLDEN_ANGLE` | Arm winding coefficient ($\theta_{\text{arm}} = \phi_0 \ln r$, pitch ≈ 22.6°) |
 | $\nu$ | `nu` | Quaternion viscosity (regularises $r\to0$) |
 | $\lambda$ | `lambda` | Vorticity-threshold brake / jet trigger |
 | $m_{\text{eff}}$ | `m_eff` | Baryonic self-gravity |

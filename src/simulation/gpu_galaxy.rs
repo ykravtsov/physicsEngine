@@ -21,7 +21,8 @@
 //!   v(r, φ) = ω(r)k̂ + φ₀ ln r     (φ₀ pitch related to golden ratio)
 //!
 //! The attractor is the golden-ratio logarithmic spiral:
-//!   r(φ) = r₀ exp(φ / φ₀),    φ₀ = 2π / ln φ ≈ 2.4 rad,    φ = (1+√5)/2
+//!   r(θ) = r₀ exp(θ / b),   b = arm winding coefficient,   φ = (1+√5)/2
+//!   (2π / ln φ ≈ 13.06 rad; the 2.39996 used below is the golden angle 2π/φ².)
 
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
@@ -33,9 +34,13 @@ const WORKGROUP_SIZE: u32 = 64;
 /// Golden ratio φ = (1+√5)/2 — the natural attractor pitch of QDM-NS vortex arms.
 const PHI: f32 = 1.6180339887498948482;
 
-/// φ₀ = 2π / ln(φ) ≈ 2.4 rad — logarithmic-spiral pitch angle eigenvalue from
-/// the ν∇² + Lorentz-pinch balance in the QDM-NS operator.
-const PHI0: f32 = 2.399_963; // 2π / ln(1.618034)
+/// Arm winding coefficient b in θ = b·ln r, used for the initial particle layout.
+/// Value = golden angle 2π/φ² ≈ 2.39996 rad (pitch angle atan(1/b) ≈ 22.6°).
+/// Note: 2π/ln φ would be ≈ 13.06 rad (pitch ≈ 4.38°).
+/// TODO: galaxy_sim.wgsl computes the arm-restoring force with b = 2π/ln(phi_value)
+/// ≈ 13.06, so the initial layout (2.4) and the restoring force (13.06) target
+/// different spirals. Pick one convention for both.
+const GOLDEN_ANGLE: f32 = 2.399_963; // 2π / φ²
 
 #[derive(Resource)]
 pub struct ParticleCount {
@@ -122,7 +127,7 @@ fn setup_gpu_galaxy(
     // Genesis Initialization — QDM-NS golden-ratio logarithmic spiral
     //
     // Steady-state, axisymmetric velocity quaternion from the QDM-NS operator:
-    //   v(r, φ) = ω(r) k̂  +  φ₀ · ln r      (φ₀ = 2π/ln φ ≈ 2.4 rad)
+    //   v(r, φ) = ω(r) k̂  +  φ₀ · ln r      (README notation)
     //
     // The attractor spiral: r(φ) = r₀ · exp(φ / φ₀)
     // Inverted for init: given r, the on-arm angle is φ = φ₀ · ln(r / r₀)
@@ -131,11 +136,11 @@ fn setup_gpu_galaxy(
     let mut particles = Vec::with_capacity(particle_count.count);
     let mut rng = rand::thread_rng();
 
-    // φ₀ = 2π / ln(φ) — pitch-angle eigenvalue from ν∇² + Lorentz-pinch balance
-    let phi0: f32 = PHI0;
+    // Arm winding coefficient (golden angle 2π/φ², see GOLDEN_ANGLE above)
+    let phi0: f32 = GOLDEN_ANGLE;
 
     for i in 0..particle_count.count {
-        // 1. Sample radius log-uniformly so density ∝ 1/r (flat surface density)
+        // 1. Sample radius uniformly in r, so surface density Σ ∝ 1/r
         let r: f32 = rng.gen_range(2.0_f32..60.0_f32);
 
         // 2. QDM-NS on-arm angle: θ = φ₀ · ln r
@@ -170,7 +175,13 @@ fn setup_gpu_galaxy(
         //    The scalar part φ₀·ln(r) encodes the logarithmic-spiral flow pitch.
         let tangent = Vec3::new(-pos.z, 0.0, pos.x).normalize();
         let omega = 15.0_f32; // ω — set by Ψ̄·J pinch strength (tunable via uniforms)
-        let log_pitch = phi0 * r.ln(); // scalar (w) component of velocity quaternion
+        let log_pitch = phi0 * r.ln();
+        // TODO: README describes φ₀·ln r as the *scalar* part of the velocity
+        // quaternion, but here it is stored in vel.y, i.e. the vertical (out-of-disk)
+        // velocity, because the disk lies in the x–z plane. (vel.w is the pressure
+        // slot and is overwritten by the shader each step.) Also, `omega` is used
+        // as a tangential *speed*, not an angular velocity. The intended behaviour
+        // is ambiguous, so it is left unchanged; see THEORY.md §3.2 and §4.
 
         let vel = Vec4::new(
             tangent.x * omega,
