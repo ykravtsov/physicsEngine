@@ -2,6 +2,8 @@
 
 A custom 3D physics engine built from scratch in Rust using **pure quaternion mathematics** — no matrix transforms (except the final GPU projection). This engine implements the **Quaternionic Dirac-Maxwell-NS (QDM-NS)** unified vortex field theory: a single quaternion operator that unifies Navier-Stokes fluid dynamics, Maxwell electromagnetism, and Dirac-like spin into one closed, self-consistent framework.
 
+📐 For a symbol-by-symbol write-up of the equations, units, open questions and observational checks, see [THEORY.md](THEORY.md).
+
 ## 🌀 What You See
 
 A life-like 3D hurricane simulation with 50,000 particles you can fly through:

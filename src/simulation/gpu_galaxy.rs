@@ -181,7 +181,7 @@ fn setup_gpu_galaxy(
         // velocity, because the disk lies in the x–z plane. (vel.w is the pressure
         // slot and is overwritten by the shader each step.) Also, `omega` is used
         // as a tangential *speed*, not an angular velocity. The intended behaviour
-        // is ambiguous, so it is left unchanged; see THEORY.md §2.
+        // is ambiguous, so it is left unchanged; see THEORY.md §3.2 and §4.
 
         let vel = Vec4::new(
             tangent.x * omega,
