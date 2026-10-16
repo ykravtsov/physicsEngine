@@ -9,7 +9,9 @@ pub struct QuaternionCamera {
     pub pos_y: f32,
     pub pos_z: f32,
     pub orientation: FluxQuaternion, // unit quaternion
+    #[allow(dead_code)]
     pub move_speed: f32,
+    #[allow(dead_code)]
     pub look_sensitivity: f32,
 }
 
@@ -26,6 +28,7 @@ impl QuaternionCamera {
     }
 
     /// Move forward/back along camera's local Z axis
+    #[allow(dead_code)]
     pub fn move_forward(&mut self, amount: f32) {
         let (fx, fy, fz) = self.orientation.rotate_vec3(0.0, 0.0, -1.0);
         self.pos_x += fx * amount;
@@ -34,6 +37,7 @@ impl QuaternionCamera {
     }
 
     /// Move right/left along camera's local X axis
+    #[allow(dead_code)]
     pub fn move_right(&mut self, amount: f32) {
         let (rx, ry, rz) = self.orientation.rotate_vec3(1.0, 0.0, 0.0);
         self.pos_x += rx * amount;
@@ -42,6 +46,7 @@ impl QuaternionCamera {
     }
 
     /// Move up/down along camera's local Y axis
+    #[allow(dead_code)]
     pub fn move_up(&mut self, amount: f32) {
         let (ux, uy, uz) = self.orientation.rotate_vec3(0.0, 1.0, 0.0);
         self.pos_x += ux * amount;
@@ -51,6 +56,7 @@ impl QuaternionCamera {
 
     /// Rotate camera by mouse delta (dx = yaw, dy = pitch)
     /// Uses quaternion multiplication — no gimbal lock
+    #[allow(dead_code)]
     pub fn rotate(&mut self, dx: f32, dy: f32) {
         // Yaw: rotate around world Y axis
         let yaw = FluxQuaternion::from_axis_angle(0.0, 1.0, 0.0, -dx * self.look_sensitivity);
