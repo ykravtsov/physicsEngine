@@ -2,8 +2,7 @@
 //! soft sprites with a bloom pass. `--cpu` integrates on the CPU and only
 //! uses the GPU to draw.
 
-use crate::galaxy::{CurveCheck, GalaxyConfig, GalaxySimulation, curve_check};
-use crate::hurricane_3d::Particle;
+use crate::galaxy::{CurveCheck, GalaxyConfig, GalaxySimulation, Particle, curve_check};
 use crate::quaternion::camera::QuaternionCamera;
 use crate::quaternion::math::FluxQuaternion;
 use bytemuck::{Pod, Zeroable};

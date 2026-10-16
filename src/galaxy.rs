@@ -13,8 +13,17 @@
 //! acceleration and gives the disk a vertical vortex. Tangential speed is
 //! not relaxed toward a prescribed v_c(r); it comes from the accelerations.
 
-use crate::hurricane_3d::Particle;
 use crate::quaternion::math::FluxQuaternion;
+
+/// One star. `flux.w` is a pressure hint; `flux.xyz` is velocity.
+/// Color is computed in the sprite shader, not stored on the particle.
+#[derive(Clone, Copy)]
+pub struct Particle {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub flux: FluxQuaternion,
+}
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -289,12 +298,6 @@ pub struct SnapshotStats {
 // ── initialisation ─────────────────────────────────────────────────────────
 
 impl GalaxySimulation {
-    /// Default spiral: MOND on, vortex on. Same as `with_config(_, GalaxyConfig::default(), None)`.
-    #[allow(dead_code)]
-    pub fn new(count: usize) -> Self {
-        Self::with_config(count, GalaxyConfig::default(), None)
-    }
-
     pub fn with_config(count: usize, config: GalaxyConfig, seed: Option<u64>) -> Self {
         let rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
@@ -354,32 +357,11 @@ impl GalaxySimulation {
             let pressure = (vc / MAX_SPEED).clamp(0.0, 1.0);
             let flux = FluxQuaternion::new(pressure, vx, vy, vz);
 
-            // Color: core gold → arm cyan → outer deep blue
-            let t = (r / OUTER_RADIUS).clamp(0.0, 1.0);
-            let (cr, cg, cb, ca) = if r < 18.0 {
-                (1.0, 0.95, 0.80, 1.0)
-            } else if r < 60.0 {
-                let s = (r - 18.0) / 42.0;
-                (1.0 - s * 0.65, 0.85 + s * 0.10, 0.3 + s * 0.65, 0.95)
-            } else {
-                (
-                    0.20 + (1.0 - t) * 0.25,
-                    0.30 + (1.0 - t) * 0.30,
-                    0.90 + t * 0.10,
-                    (0.85 - t * 0.65).max(0.05),
-                )
-            };
-
             particles.push(Particle {
                 x: px,
                 y: py,
                 z: pz,
                 flux,
-                r: cr,
-                g: cg,
-                b: cb,
-                a: ca,
-                size: if r < 14.0 { 2.0 } else { 1.0 },
             });
         }
 
@@ -697,32 +679,6 @@ impl GalaxySimulation {
                 let pres = (sv / MAX_SPEED).clamp(0.0, 1.0);
                 p.flux = FluxQuaternion::new(pres, stx * sv, 0.0, stz * sv);
             }
-
-            // ── 11. Color ──────────────────────────────────────────────────
-            let energy = (spd / MAX_SPEED).clamp(0.0, 1.0);
-            let bh_prox = (1.0 - (r_bh_final / BH_GLOW_R).clamp(0.0, 1.0)).max(0.0);
-            let r_new_xz = (p.x * p.x + p.z * p.z).sqrt();
-            let t = (r_new_xz / OUTER_RADIUS).clamp(0.0, 1.0);
-
-            if r_bh_final < BH_GLOW_R {
-                // Accretion disk — orange→white heat
-                p.r = 1.0;
-                p.g = 0.50 + bh_prox * 0.50;
-                p.b = bh_prox * 0.30;
-                p.a = 0.55 + bh_prox * 0.45;
-            } else if r_new_xz < 18.0 {
-                // Galactic core — bright gold-white
-                p.r = 1.0;
-                p.g = 0.95;
-                p.b = 0.80;
-                p.a = 1.0;
-            } else {
-                // Spiral arms — blue-cyan, brighter where faster
-                p.r = (0.15 + energy * 0.55 + (1.0 - t) * 0.20).clamp(0.0, 1.0);
-                p.g = (0.30 + energy * 0.30 + (1.0 - t) * 0.20).clamp(0.0, 1.0);
-                p.b = (0.88 + t * 0.12).clamp(0.0, 1.0);
-                p.a = (0.88 - t * 0.65).max(0.04);
-            }
         }
 
         self.rng = rng;
@@ -844,7 +800,6 @@ impl GalaxySimulation {
                 p.flux.x *= extra_damp;
                 p.flux.y *= extra_damp;
                 p.flux.z *= extra_damp;
-                spd *= extra_damp;
             }
 
             p.flux.w = (vc_ref / MAX_SPEED).clamp(0.0, 1.0);
@@ -902,38 +857,6 @@ impl GalaxySimulation {
                 }
                 let pres = (sv / MAX_SPEED).clamp(0.0, 1.0);
                 p.flux = FluxQuaternion::new(pres, svx, vy, svz);
-            }
-
-            // ── 11. Color ──────────────────────────────────────────────────
-            let energy = (spd / MAX_SPEED).clamp(0.0, 1.0);
-            let bh_prox = (1.0 - (r_bh_final / BH_GLOW_R).clamp(0.0, 1.0)).max(0.0);
-            let r_new_xz = (p.x * p.x + p.z * p.z).sqrt();
-            let t = (r_new_xz / OUTER_RADIUS).clamp(0.0, 1.0);
-
-            if r_bh_final < BH_GLOW_R {
-                p.r = 1.0;
-                p.g = 0.50 + bh_prox * 0.50;
-                p.b = bh_prox * 0.30;
-                p.a = 0.55 + bh_prox * 0.45;
-            } else if r_new_xz < 18.0 {
-                p.r = 1.0;
-                p.g = 0.95;
-                p.b = 0.80;
-                p.a = 1.0;
-            } else if vortex && r_new_xz < 52.0 {
-                // Eyewall ring — the bright wall around the absorbed eye.
-                let s = ((r_new_xz - 18.0) / 34.0).clamp(0.0, 1.0);
-                p.r = (0.45 + energy * 0.50).clamp(0.0, 1.0);
-                p.g = (0.80 + energy * 0.20).clamp(0.0, 1.0);
-                p.b = 1.0;
-                p.a = 0.95 - s * 0.20;
-            } else {
-                p.r = (0.15 + energy * 0.55 + (1.0 - t) * 0.25).clamp(0.0, 1.0);
-                p.g = (0.35 + energy * 0.35 + (1.0 - t) * 0.25).clamp(0.0, 1.0);
-                p.b = (0.90 + t * 0.10).clamp(0.0, 1.0);
-                // The old floor of 0.04 made everything outside ~0.6 R invisible,
-                // so the disk read as a small blob around the hole.
-                p.a = (0.90 - t * 0.40).max(0.30);
             }
         }
 
