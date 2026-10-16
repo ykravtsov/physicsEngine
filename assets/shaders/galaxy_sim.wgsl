@@ -83,11 +83,14 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = particle.pos.xyz;
     let r = length(pos.xz);
 
-    // Quasar recycling: too close to centre → jet outflow along Y axis
-    if r < 2.0 {
-        particle.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-        let y_vel = select(-80.0, 80.0, (id % 2u) == 0u);
-        particle.vel = vec4<f32>(y_vel, 0.0, 0.0, 0.0); // w=pressure, xyz=vel
+    // Quasar recycling: too close to the origin → jet along Y.
+    // Cylindrical r = length(pos.xz) stays ~0 for a particle that only moves
+    // in Y, so the old test re-fired every frame and the jet never left.
+    // vel is (vx, vy, vz, pressure); the old code wrote the jet speed into vx.
+    if length(pos) < 2.0 {
+        let sign = select(-1.0, 1.0, (id % 2u) == 0u);
+        particle.pos = vec4<f32>(0.0, sign * 2.2, 0.0, 1.0);
+        particle.vel = vec4<f32>(0.0, sign * 80.0, 0.0, 0.0);
         particles[id] = particle;
         return;
     }
@@ -98,9 +101,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // -----------------------------------------------------------------------
     let psi = vec4<f32>(particle.vel.w, particle.vel.x, particle.vel.y, particle.vel.z);
 
-    // φ₀ = 2π / ln(φ) ≈ 13.06 rad — spiral winding coefficient (θ_arm = φ₀·ln r).
-    // NOTE: gpu_galaxy.rs initialises particles with 2π/φ² ≈ 2.40 instead.
-    let phi0 = 6.283185 / log(max(uniforms.phi_value, 1.0001));
+    // φ₀ = 2π / φ² ≈ 2.40 rad — same golden angle as src/galaxy.rs.
+    // The previous 2π / ln(φ) ≈ 13.06 rad was a different spiral (pitch ≈ 4.4°).
+    let phi = max(uniforms.phi_value, 1.0001);
+    let phi0 = 6.283185 / (phi * phi);
 
     let current_theta = atan2(pos.z, pos.x);
 
@@ -145,11 +149,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let drag_force = -particle.vel.xyz * phi_drag;
 
     // -----------------------------------------------------------------------
-    // λ(ΨΨ̄ − 1)Ψ term — nonlinear vorticity-threshold brake
-    // When |Ψ|² > 1 (super-critical vorticity) this damps excess energy into
-    // jets/outflows. Derived variationally — not ad-hoc.
+    // λ(ΨΨ̄ − 1)Ψ term — nonlinear vorticity-threshold brake.
+    // |Ψ| here is a velocity quaternion with |v| ~ 15, so |Ψ|² ~ hundreds and
+    // (norm_sq − 1) was an enormous drag, not a threshold near 1. Divide by
+    // the reference speed² used at init so the brake is quiet at that speed.
     // -----------------------------------------------------------------------
-    let norm_sq      = quat_norm_sq(psi);
+    let speed_ref    = 15.0;
+    let norm_sq      = quat_norm_sq(psi) / (speed_ref * speed_ref);
     let brake_force  = -particle.vel.xyz * (uniforms.lambda * (norm_sq - 1.0));
 
     // -----------------------------------------------------------------------

@@ -6,12 +6,9 @@ A custom 3D physics engine built from scratch in Rust using **pure quaternion ma
 
 ## 🌀 What You See
 
-A life-like 3D hurricane simulation with 50,000 particles you can fly through:
+`cargo run` opens the galaxy simulation in `src/galaxy.rs`: about 60,000 stars around a fixed Plummer core, with a light black hole drifting through them. The default disk is flared (a vertical vortex: seeded vertical speed, a soft spring, an eye-wall updraft) and wound into a two-arm logarithmic spiral. The window title is `QDM-NS Galaxy — Black Hole Through Space Fluid`.
 
-- **Dark blue eye** — calm low-pressure center
-- **Bright cyan eye-wall** — maximum wind speed, highest quaternion energy density
-- **White/blue spiral bands** — outer rain bands with harmonic structure
-- **Updrafts** in the eye-wall, **downdrafts** in the eye
+The older 50,000-particle hurricane lives in `src/hurricane_3d/` and `src/simulation/hurricane.rs`. The hurricane module is not what `main` steps. See [REVIEW.md](REVIEW.md) for what the running force law does and does not implement.
 
 ## 🎮 Controls
 
@@ -22,6 +19,7 @@ A life-like 3D hurricane simulation with 50,000 particles you can fly through:
 | `Space` | Fly up |
 | `Shift` | Fly down |
 | `Mouse` | Look around (always active) |
+| `M` | Toggle the MOND boost (ignored with `--legacy`) |
 | `Escape` | Quit |
 
 ## 🔬 The Physics
@@ -75,10 +73,13 @@ src/
     camera.rs       -- Quaternion fly camera (no matrices, no gimbal lock)
   
   hurricane_3d/
-    mod.rs          -- Hurricane simulation: 50k particles, quaternion physics
+    mod.rs          -- Particle type shared with the galaxy sim
     renderer.rs     -- wgpu particle renderer (point sprites, additive blending)
-  
-  main.rs           -- winit event loop, frame timing, input dispatch
+
+  galaxy.rs         -- Live galaxy integrator (Plummer core, black hole, optional MOND and vortex)
+  headless.rs       -- `--headless` sampler: rotation curve and disk thickness, no window
+
+  main.rs           -- winit event loop, frame timing, input dispatch, `--headless`
 
 assets/shaders/
   particle3d.wgsl   -- GPU vertex/fragment shader for particles
@@ -131,7 +132,7 @@ r(\theta) = r_0 \exp\!\left(\frac{\theta}{\phi_0}\right), \qquad
 \varphi = \frac{1+\sqrt{5}}{2}
 $$
 
-Here $\theta$ is the azimuthal angle and $\phi_0$ is the arm winding coefficient ($\theta_{\text{arm}} = \phi_0 \ln r$), as used in `src/galaxy.rs` (`GOLDEN_ANGLE`). The pitch angle is $\arctan(1/\phi_0) \approx 22.6^\circ$. For reference, other "golden" conventions give different spirals: growth by $\varphi$ per full turn means $\phi_0 = 2\pi/\ln\varphi \approx 13.06$ rad (pitch $\arctan(\ln\varphi/2\pi) \approx 4.38^\circ$, used by `assets/shaders/galaxy_sim.wgsl`), and the classic golden spiral (growth by $\varphi$ per quarter turn) has $\phi_0 = \pi/(2\ln\varphi) \approx 3.26$ (pitch $\arctan(2\ln\varphi/\pi) \approx 17.03^\circ$).
+Here $\theta$ is the azimuthal angle and $\phi_0$ is the arm winding coefficient ($\theta_{\text{arm}} = \phi_0 \ln r$), as used in `src/galaxy.rs` (`GOLDEN_ANGLE`) and in `assets/shaders/galaxy_sim.wgsl`. The pitch angle is $\arctan(1/\phi_0) \approx 22.6^\circ$. For reference, other "golden" conventions give different spirals: growth by $\varphi$ per full turn means $\phi_0 = 2\pi/\ln\varphi \approx 13.06$ rad (pitch $\arctan(\ln\varphi/2\pi) \approx 4.38^\circ$), and the classic golden spiral (growth by $\varphi$ per quarter turn) has $\phi_0 = \pi/(2\ln\varphi) \approx 3.26$ (pitch $\arctan(2\ln\varphi/\pi) \approx 17.03^\circ$). The compute shader is not compiled into `cargo run`.
 
 This is **not** forced — it is the attractor of the nonlinear vortex + EM-wire system. Arm spacing and winding are fixed by the golden ratio because it is the continued-fraction optimum for self-similar vorticity transport.
 
@@ -148,10 +149,9 @@ This is **not** forced — it is the attractor of the nonlinear vortex + EM-wire
 
 ### Why This Framework is Self-Consistent
 
-- **Units**: everything lives in the same quaternion algebra — dimensions match automatically (no mixing fluid + EM by hand).
-- **Limits**: reduces to Dirac in the microscopic limit; to GR-like weak-field gravity via $m_{\text{eff}}$ in the macroscopic limit.
-- **No free parameters**: $\nu$, $\lambda$, $m_{\text{eff}}$ are fixed by observed galactic plasma viscosity, jet power, and baryon density.
-- **Testable predictions**: (1) flat rotation curves via $\bar{\Psi}\cdot J$ Lorentz support (no dark halo); (2) jet power scales with $\lambda$; (3) pitch angle universally near golden ratio (matches grand-design spirals).
+- **Limits**: the written operator is meant to reduce to Dirac in the microscopic limit and to a weak-field mass term in the macroscopic limit. THEORY.md §3 is the dimensional check: the master equation as written does not yet make the units match by itself.
+- **What the window actually integrates** is not that operator. `src/galaxy.rs` applies a Plummer core, a Plummer black hole, a vertical spring, a small two-arm pinch, and (unless `--legacy`) a weak drag. `--mond` multiplies the total Newtonian acceleration `|a_core + a_BH|` by the simple interpolating function; it does not come from a computed `B` or `J`. Flat curves are not produced by the pinch. Measured numbers are in [REVIEW.md](REVIEW.md).
+- **Predictions the theory would like to make**, once a discretisation of `DΨ` exists: (1) a flat rotation curve from whatever radial support the closed equation actually has; (2) jet power scaling with `λ`; (3) a pitch near the golden ratio. The live pinch puts the golden angle in by hand.
 
 ### Hurricane Physics (original simulation)
 
@@ -170,7 +170,21 @@ The hurricane sim maps the same operator terms:
 # Requires Rust (stable)
 cargo build --release
 cargo run --release
+
+# No window. Writes a rotation-curve CSV (gitignored under analysis/review_data/).
+cargo run --release -- --headless --seconds 40 --particles 60000 --seed 1 \
+    --out analysis/review_data/modern_curve.csv
+
+# Same disk and seed, parent-branch forces:
+cargo run --release -- --headless --legacy --seconds 40 --particles 60000 --seed 1 \
+    --out analysis/review_data/legacy_curve.csv
+
+# Vortex disk, Newtonian gravity (MOND off):
+cargo run --release -- --headless --no-mond --seconds 40 --particles 60000 --seed 1 \
+    --out analysis/review_data/vortex_only_curve.csv
 ```
+
+`--mond` / `--no-mond`, `--vortex` / `--no-vortex`, and `--a0 <float>` change the live force law. `--legacy` ignores those and runs the pre-fix integrator. `M` toggles MOND while the window is open.
 
 ## Dependencies
 
