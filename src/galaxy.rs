@@ -7,9 +7,11 @@
 //! Operator applied each frame:
 //!   DΨ = (∇ + m_eff + ν∇² − D/Dt) Ψ + Ψ̄·J + λ(ΨΨ̄ − 1)Ψ
 //!
-//! `GalaxyConfig::legacy` reproduces the force law from fix/math-and-theory-doc.
-//! The default config turns on two bug fixes (two-arm phase, damping vs viscosity)
-//! plus optional MOND gravity and a hurricane-style vortex, both flagged.
+//! `GalaxyConfig::legacy` reproduces the force law from before the vortex/MOND
+//! flags. The default config fixes the two-arm phase and the 6%/s damping,
+//! and (flagged) applies a simple MOND boost to the total Newtonian
+//! acceleration and gives the disk a vertical vortex. Tangential speed is
+//! not relaxed toward a prescribed v_c(r); it comes from the accelerations.
 
 use crate::hurricane_3d::Particle;
 use crate::quaternion::math::FluxQuaternion;
@@ -44,21 +46,24 @@ const BH_DRAG: f32 = 0.004;
 /// Legacy value. Only the phase = 2πk arm is stable under sin(phase); see review.
 const PINCH: f32 = 0.05;
 /// Two-arm pinch (1/s). sin(2·phase) is restoring at both arms.
-/// Kept well below NU_ORBIT so the torque cannot drag v_θ off the MOND/Newton target.
-/// Steady tangential residual is at most (PINCH_ARM / NU_ORBIT) · v.
-const PINCH_ARM: f32 = 0.08;
+///
+/// This accelerates a star toward the arm angle, which torques the disk
+/// toward the pattern speed Ω_pattern·r (solid body). There is no velocity
+/// slave pulling v_θ back onto the circular-speed curve, so the coefficient
+/// has to stay small or that torque is the rotation curve. 0.02/s moved
+/// v(195)/v(52.5) from 0.53 to 0.82 in 15 s on a Newtonian disk.
+const PINCH_ARM: f32 = 0.001;
 /// ν — legacy viscosity strength pulling stars toward Keplerian orbit (1/s).
 const NU: f32 = 0.015;
-/// Orbital-restore rate used when legacy damping is not fighting it (1/s).
-const NU_ORBIT: f32 = 1.0;
 /// Legacy vertical spring (1/s²). With 6%/s damping this collapses the disk.
 const VERTICAL_K: f32 = 0.8;
 /// Softer spring so a flared disk can keep its scale height (1/s²).
 const VERTICAL_K_VORTEX: f32 = 0.10;
 /// Legacy system-wide velocity damping (1/s). Four times NU, so v_eq ≈ 0.2 v_c.
 const DAMPING_LEGACY: f32 = 0.06;
-/// Replacement damping (1/s). Small enough that NU_ORBIT can hold a circular orbit.
-const DAMPING_RATE: f32 = 0.008;
+/// In-plane drag (1/s) on the non-legacy path. 0.1% per second, so over a
+/// 40 s run it removes about 4% of the speed. It is not what sets v(r).
+const DAMPING_RATE: f32 = 0.001;
 /// Rigid pattern speed of the two-arm density wave (rad/s).
 /// Near the circular frequency around r ≈ 100–130 for a flat v ≈ 9, so corotation
 /// sits in the disk instead of torquing the whole curve toward solid-body rotation.
@@ -134,12 +139,23 @@ fn mond_circular_speed(r: f32, a0: f32) -> f32 {
     (vc * vc * mond_boost(a_n, a0)).sqrt()
 }
 
-fn target_circular_speed(r: f32, config: &GalaxyConfig) -> f32 {
-    if config.legacy || !config.mond {
-        newton_circular_speed(r)
+/// Midplane circular speed `sqrt(a_r · r)` of the core Plummer field.
+///
+/// When MOND is on, `a_r` is the core's Newtonian acceleration times the same
+/// simple-μ boost the integrator applies to `|a_core + a_BH|`. The black hole
+/// is left out of this number: it is not centered, so it has no v_c(r).
+/// Callers use it as an initial / respawn condition and as a reference for
+/// the high-speed drag. The integrator does not relax `v` toward it.
+fn force_circular_speed(r: f32, config: &GalaxyConfig) -> f32 {
+    let r = r.max(1e-3);
+    // |a_N| of the core at cylindrical r, in the midplane (3D radius = r).
+    let a_n = plummer_accel_factor(r * r, GM_CORE, EPS_CORE) * r;
+    let a_r = if !config.legacy && config.mond {
+        a_n * mond_boost(a_n, config.a0)
     } else {
-        mond_circular_speed(r, config.a0)
-    }
+        a_n
+    };
+    (a_r * r).sqrt()
 }
 
 /// Eyewall fountain. Peaks at `EYEWALL_R` and pushes |y| out to about `Y_WALL`,
@@ -159,7 +175,12 @@ fn eyewall_updraft(r: f32, y: f32) -> f32 {
 pub struct GalaxyConfig {
     /// Reproduce the pre-fix force law and the razor-thin initial disk.
     pub legacy: bool,
-    /// Boost the core's Newtonian acceleration with the simple MOND μ function.
+    /// Multiply `|a_core + a_BH|` by the simple MOND μ boost.
+    ///
+    /// `a_core` is the Plummer acceleration at the star's 3D distance from the
+    /// origin. `a_BH` is the Plummer acceleration at the 3D separation from
+    /// the black hole. The spring and the updraft are applied after the boost
+    /// and are not part of `a_N`. Ignored when `legacy` is set.
     pub mond: bool,
     /// MOND scale a0 in code units. Ignored when `mond` is false or `legacy` is true.
     pub a0: f32,
@@ -192,11 +213,9 @@ impl GalaxyConfig {
                 "--vortex" => c.vortex = true,
                 "--no-vortex" => c.vortex = false,
                 "--a0" => {
-                    if i + 1 < args.len() {
+                    if let Some(v) = args.get(i + 1).and_then(|s| s.parse::<f32>().ok()) {
                         i += 1;
-                        if let Ok(v) = args[i].parse::<f32>() {
-                            c.a0 = v.max(0.0);
-                        }
+                        c.a0 = v.max(0.0);
                     }
                 }
                 _ => {}
@@ -238,6 +257,9 @@ pub struct GalaxySimulation {
     time: f32,
     /// ∫ Ω_pattern dt. The arm locus is θ = b ln r + pattern_angle (+ π for arm 2).
     pattern_angle: f32,
+    /// Initialisation and respawn. Seeded from `--seed` so a headless run
+    /// repeats, including which stars are reborn.
+    rng: StdRng,
 }
 
 #[derive(Clone, Debug)]
@@ -274,14 +296,14 @@ impl GalaxySimulation {
     }
 
     pub fn with_config(count: usize, config: GalaxyConfig, seed: Option<u64>) -> Self {
-        let mut rng = match seed {
+        let rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
         };
-        Self::from_rng(count, config, &mut rng)
+        Self::from_rng(count, config, rng)
     }
 
-    fn from_rng(count: usize, config: GalaxyConfig, rng: &mut StdRng) -> Self {
+    fn from_rng(count: usize, config: GalaxyConfig, mut rng: StdRng) -> Self {
         let mut particles = Vec::with_capacity(count);
         let vortex_init = config.vortex && !config.legacy;
 
@@ -317,7 +339,7 @@ impl GalaxySimulation {
                 ((rng.r#gen::<f32>() - 0.5) * DISK_THICKNESS, 0.0)
             };
 
-            let vc = target_circular_speed(r, &config).min(MAX_SPEED);
+            let vc = force_circular_speed(r, &config).min(MAX_SPEED);
             let tx = -pz / r;
             let tz = px / r;
             let mut vx = tx * vc;
@@ -388,6 +410,7 @@ impl GalaxySimulation {
             absorbed_total: 0,
             time: 0.0,
             pattern_angle: 0.0,
+            rng,
         }
     }
 }
@@ -409,7 +432,7 @@ impl GalaxySimulation {
         self.frame += 1;
 
         // ── Diagnostic output every 300 frames (~5 s at 60 fps) ────────────
-        if self.verbose && self.frame % 300 == 0 {
+        if self.verbose && self.frame.is_multiple_of(300) {
             self.print_diagnostics(dt);
         }
     }
@@ -529,7 +552,9 @@ impl GalaxySimulation {
     /// force law this review measured, including the 6%/s damping and the
     /// one-arm `sin(phase)` pinch.
     fn update_particles_legacy(&mut self, dt: f32, bhx: f32, bhy: f32, bhz: f32) -> u64 {
-        let mut rng = rand::thread_rng();
+        // Same seeded generator as init. Pulled out of `self` so the particle
+        // loop can mutably borrow the buffer.
+        let mut rng = std::mem::replace(&mut self.rng, StdRng::seed_from_u64(0));
         let mut absorbed = 0u64;
 
         for p in &mut self.particles {
@@ -682,11 +707,14 @@ impl GalaxySimulation {
             }
         }
 
+        self.rng = rng;
         absorbed
     }
 
     fn update_particles(&mut self, dt: f32, bhx: f32, bhy: f32, bhz: f32) -> u64 {
-        let mut rng = rand::thread_rng();
+        // Same seeded generator as init. Pulled out of `self` so the particle
+        // loop can mutably borrow the buffer.
+        let mut rng = std::mem::replace(&mut self.rng, StdRng::seed_from_u64(0));
         let mut absorbed = 0u64;
         let config = self.config;
         let pattern_angle = self.pattern_angle;
@@ -702,20 +730,13 @@ impl GalaxySimulation {
             let r_xz = (p.x * p.x + p.z * p.z).sqrt().max(0.5);
             let r3d = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt().max(0.5);
 
-            // ── 1. Core gravity (Plummer, optional MOND boost) ─────────────
+            // ── 1. Newtonian core, 3D radius from the origin ───────────────
             let g_core = plummer_accel_factor(r3d * r3d, GM_CORE, EPS_CORE);
-            let a_n = g_core * r3d;
-            let boost = if config.mond {
-                mond_boost(a_n, config.a0)
-            } else {
-                1.0
-            };
-            let g_core = g_core * boost;
-            let ax = -p.x * g_core;
+            let mut ax = -p.x * g_core;
             let mut ay = -p.y * g_core;
-            let az = -p.z * g_core;
+            let mut az = -p.z * g_core;
 
-            // ── 2. BH gravity (Plummer, Newtonian perturber) ───────────────
+            // ── 2. Newtonian BH, 3D separation. Cap |a_BH|, not the factor. ─
             let dx = bhx - p.x;
             let dy = bhy - p.y;
             let dz = bhz - p.z;
@@ -726,38 +747,49 @@ impl GalaxySimulation {
             if a_bh > BH_ACCEL_CAP {
                 g_bh = BH_ACCEL_CAP / r_bh.max(1e-3);
             }
-            let ax = ax + dx * g_bh;
+            ax += dx * g_bh;
             ay += dy * g_bh;
-            let az = az + dz * g_bh;
+            az += dz * g_bh;
 
-            // ── 3. Vertical structure ──────────────────────────────────────
+            // ── 3. MOND on the total Newtonian acceleration ────────────────
+            // Direction stays Newtonian. Magnitude is boosted by the simple μ
+            // function of |a_core + a_BH|. The spring and the updraft are
+            // added afterwards and are not part of a_N. In the midplane, far
+            // from the black hole, this reduces to boosting the core alone.
+            if config.mond {
+                let a_n = (ax * ax + ay * ay + az * az).sqrt();
+                let boost = mond_boost(a_n, config.a0);
+                ax *= boost;
+                ay *= boost;
+                az *= boost;
+            }
+
+            // ── 4. Vertical structure (not gravity) ────────────────────────
             ay -= p.y * k_vert;
             if vortex {
                 ay += eyewall_updraft(r_xz, p.y);
             }
 
-            // ── 4. ν∇²Ψ — hold the in-plane velocity near the target orbit ─
-            // Target speed is the MOND circular speed when that flag is on,
-            // otherwise the Plummer (Newtonian) circular speed. A purely
-            // Keplerian target would erase a flat curve as fast as it formed.
-            let vc = target_circular_speed(r_xz, &config).min(MAX_SPEED);
+            // Reference circular speed of the core in the midplane. Used for
+            // the inflow scale, the high-speed drag, and the pressure scalar.
+            // It is not a velocity target: nothing below adds (v_target − v).
+            let vc_ref = force_circular_speed(r_xz, &config).min(MAX_SPEED);
             let tx = -p.z / r_xz;
             let tz = p.x / r_xz;
-            let mut tvx = tx * vc;
-            let mut tvz = tz * vc;
-            if vortex {
-                let vr = -vc * INFLOW_FRAC;
-                tvx += (p.x / r_xz) * vr;
-                tvz += (p.z / r_xz) * vr;
-            }
-            let ax = ax + (tvx - p.flux.x) * NU_ORBIT;
-            let az = az + (tvz - p.flux.z) * NU_ORBIT;
 
-            // ── 5. Two-arm density wave ────────────────────────────────────
+            // ── 5. Inflow as a force, a few percent of v_c²/r, radially in ─
+            if vortex {
+                let a_in = INFLOW_FRAC * vc_ref * vc_ref / r_xz;
+                ax -= (p.x / r_xz) * a_in;
+                az -= (p.z / r_xz) * a_in;
+            }
+
+            // ── 6. Two-arm density wave ────────────────────────────────────
             // sin(phase) is restoring only at phase = 2πk, so the arm placed
             // at offset π was unstable and sheared away. sin(2·phase) is
             // restoring at both arms. The pattern rotates at PATTERN_OMEGA
             // instead of pinning stars to a fixed angle (which stops the orbit).
+            // PINCH_ARM is small so the mean torque does not rewrite v(r).
             let theta_arm = GOLDEN_ANGLE * r_xz.ln() + pattern_angle;
             let phase = p.z.atan2(p.x) - theta_arm;
             let spd_now = (p.flux.x * p.flux.x + p.flux.z * p.flux.z).sqrt().max(1.0);
@@ -765,24 +797,17 @@ impl GalaxySimulation {
             let ax = ax - tx * pinch;
             let az = az - tz * pinch;
 
-            // ── 6. Integrate velocity ──────────────────────────────────────
+            // ── 7. Integrate velocity ──────────────────────────────────────
             // Horizontal damping is weak (see DAMPING_RATE). Vertical damping
             // is weaker still in vortex mode, otherwise the spring collapses
-            // every orbit onto y = 0.
+            // every orbit onto y = 0. The old 0.06·Ω_Kepler quaternion twist
+            // is not applied here: it tipped v_θ into v_r and biased the
+            // rotation curve. `--legacy` still has that twist.
             let damp_h = 1.0 - DAMPING_RATE * dt;
             let damp_v = 1.0 - DAMPING_RATE * vy_damp_scale * dt;
             p.flux.x = p.flux.x * damp_h + ax * dt;
             p.flux.y = p.flux.y * damp_v + ay * dt;
             p.flux.z = p.flux.z * damp_h + az * dt;
-
-            // ── 7. Ψ̄·J Coriolis — quaternion sandwich ─────────────────────
-            let r_pl = (r3d * r3d + EPS_CORE * EPS_CORE).sqrt();
-            let omega = (GM_CORE / (r_pl * r_pl * r_pl).max(1.0)).sqrt().min(3.5);
-            let cq = FluxQuaternion::from_axis_angle(0.0, 1.0, 0.0, omega * dt * 0.06);
-            let (rvx, rvy, rvz) = cq.rotate_vec3(p.flux.x, p.flux.y, p.flux.z);
-            p.flux.x = rvx;
-            p.flux.y = rvy;
-            p.flux.z = rvz;
 
             // ── 8. Speed cap + progressive high-speed drag ────────────────
             let mut spd = (p.flux.x * p.flux.x + p.flux.y * p.flux.y + p.flux.z * p.flux.z).sqrt();
@@ -793,9 +818,9 @@ impl GalaxySimulation {
                 p.flux.z *= s;
                 spd = MAX_SPEED;
             }
-            // Threshold uses the same target speed the orbit is aiming at,
-            // so a MOND-boosted outer disk is not flagged as a slingshot.
-            let excess = spd - vc * 1.5;
+            // Threshold is the midplane circular speed of the force law, so a
+            // MOND-boosted outer disk is not flagged as a slingshot.
+            let excess = spd - vc_ref * 1.5;
             if excess > 0.0 {
                 let extra_damp = 1.0 - (excess / MAX_SPEED) * 0.3 * dt;
                 p.flux.x *= extra_damp;
@@ -804,7 +829,7 @@ impl GalaxySimulation {
                 spd *= extra_damp;
             }
 
-            p.flux.w = (vc / MAX_SPEED).clamp(0.0, 1.0);
+            p.flux.w = (vc_ref / MAX_SPEED).clamp(0.0, 1.0);
 
             // ── 9. Integrate position ──────────────────────────────────────
             p.x += p.flux.x * dt;
@@ -822,7 +847,7 @@ impl GalaxySimulation {
             // "escape speed" deleted the eyewall as soon as the updraft started.
             let r_cyl = (p.x * p.x + p.z * p.z).sqrt();
             let v_plane = (p.flux.x * p.flux.x + p.flux.z * p.flux.z).sqrt();
-            let local_vc = target_circular_speed(r_cyl.min(OUTER_RADIUS), &config);
+            let local_vc = force_circular_speed(r_cyl.min(OUTER_RADIUS), &config);
             let escaped = r_cyl > OUTER_RADIUS * 1.02 && v_plane > local_vc * 1.8;
 
             if r_bh_final < BH_ABSORB_R || r_cyl > OUTER_RADIUS * 1.08 || escaped {
@@ -847,7 +872,7 @@ impl GalaxySimulation {
                     ((rng.r#gen::<f32>() - 0.5) * DISK_THICKNESS, 0.0)
                 };
                 p.y = py;
-                let sv = target_circular_speed(sr, &config).min(MAX_SPEED);
+                let sv = force_circular_speed(sr, &config).min(MAX_SPEED);
                 let stx = -p.z / sr;
                 let stz = p.x / sr;
                 let mut svx = stx * sv;
@@ -894,6 +919,7 @@ impl GalaxySimulation {
             }
         }
 
+        self.rng = rng;
         absorbed
     }
 
@@ -1034,9 +1060,69 @@ mod tests {
         assert!((ratio - 1.0).abs() < 0.05, "v^4/(GM a0) = {ratio}");
     }
 
+    fn v_at(s: &SnapshotStats, r_mid: f32) -> f32 {
+        s.bins
+            .iter()
+            .find(|b| (b.r_mid - r_mid).abs() < 1.0 && b.count >= 15)
+            .map(|b| b.v_theta)
+            .unwrap_or(0.0)
+    }
+
+    /// v(195) / v(52.5). The analytic midplane ratios are about 0.83 (MOND,
+    /// a0 = 1) and 0.53 (Plummer). This checks the integrated curve, not a
+    /// velocity assignment.
+    fn outer_inner_ratio(s: &SnapshotStats) -> f32 {
+        let outer = v_at(s, 195.0);
+        let inner = v_at(s, 52.5);
+        assert!(inner > 1.0, "inner bin empty or stalled: {inner}");
+        outer / inner
+    }
+
     #[test]
-    fn vortex_disk_stays_thick_and_mond_keeps_outer_speed() {
-        let n = 2500;
+    fn a_star_at_rest_is_not_snapped_to_circular_speed() {
+        // NU_ORBIT = 1/s would close most of the gap to v_c in one second.
+        // With that term gone, a star at rest only picks up a tangential
+        // speed from the weak pinch. Radial speed should grow from gravity.
+        let mut sim = GalaxySimulation::with_config(
+            1,
+            GalaxyConfig {
+                vortex: false,
+                mond: true,
+                ..GalaxyConfig::default()
+            },
+            Some(1),
+        );
+        sim.verbose = false;
+        sim.black_hole.x = 8_000.0;
+        sim.black_hole.vx = 0.0;
+        sim.black_hole.vy = 0.0;
+        sim.black_hole.vz = 0.0;
+        let p = &mut sim.particles[0];
+        p.x = 100.0;
+        p.y = 0.0;
+        p.z = 0.0;
+        p.flux = FluxQuaternion::new(0.0, 0.0, 0.0, 0.0);
+
+        for _ in 0..60 {
+            sim.update(1.0 / 60.0);
+        }
+        let p = &sim.particles[0];
+        let v_theta = p.flux.z; // tangent at (x, 0) is +z
+        let v_rad = p.flux.x; // radial at (x, 0) is +x; gravity pulls inward
+        let vc = force_circular_speed(100.0, &sim.config);
+        assert!(
+            v_theta.abs() < 1.0,
+            "tangential speed {v_theta} snapped toward v_c {vc}"
+        );
+        assert!(
+            v_rad < -0.3,
+            "expected an inward radial speed from gravity, got {v_rad}"
+        );
+    }
+
+    #[test]
+    fn vortex_disk_stays_thick_and_mond_ratio_stays_above_newtonian() {
+        let n = 2000;
         let mut legacy = GalaxySimulation::with_config(
             n,
             GalaxyConfig {
@@ -1046,41 +1132,75 @@ mod tests {
             Some(7),
         );
         legacy.verbose = false;
-        let mut modern = GalaxySimulation::with_config(n, GalaxyConfig::default(), Some(7));
-        modern.verbose = false;
+        let mut mond = GalaxySimulation::with_config(n, GalaxyConfig::default(), Some(7));
+        mond.verbose = false;
+        let mut newton = GalaxySimulation::with_config(
+            n,
+            GalaxyConfig {
+                mond: false,
+                ..GalaxyConfig::default()
+            },
+            Some(7),
+        );
+        newton.verbose = false;
 
         let y0_l = legacy.stats().rms_y;
-        let y0_m = modern.stats().rms_y;
+        let y0_m = mond.stats().rms_y;
         assert!(y0_m > y0_l * 3.0, "init thickness {y0_m} vs {y0_l}");
 
-        let steps = 6 * 60;
+        // 10 s is long enough for a 1/s velocity slave to have locked, and
+        // short of the eye-wall bounce emptying the r ≈ 52 bin. The outer
+        // disk (r ≈ 90 and r ≈ 195) is where the force law shows.
+        let steps = 10 * 60;
         for _ in 0..steps {
             legacy.update(1.0 / 60.0);
-            modern.update(1.0 / 60.0);
+            mond.update(1.0 / 60.0);
+            newton.update(1.0 / 60.0);
         }
         let sl = legacy.stats();
-        let sm = modern.stats();
+        let sm = mond.stats();
+        let sn = newton.stats();
         assert!(
             sm.rms_y > sl.rms_y * 3.0,
-            "t=6s thickness modern {} legacy {}",
+            "t=10s thickness mond {} legacy {}",
             sm.rms_y,
             sl.rms_y
         );
-        assert!(sm.arm_contrast + 0.05 >= sl.arm_contrast || sm.arm_contrast > 0.15);
 
-        let outer = |s: &SnapshotStats| {
-            s.bins
-                .iter()
-                .find(|b| (b.r_mid - 150.0).abs() < 1.0)
-                .map(|b| b.v_theta)
-                .unwrap_or(0.0)
-        };
-        let v_l = outer(&sl);
-        let v_m = outer(&sm);
+        let v195_m = v_at(&sm, 195.0);
+        let v195_n = v_at(&sn, 195.0);
+        let v90_m = v_at(&sm, 90.0);
+        let v90_n = v_at(&sn, 90.0);
+        // Analytic midplane circular speeds: MOND 8.62 / 9.41, Plummer 4.52 / 6.63.
         assert!(
-            v_m > v_l * 1.4,
-            "outer v_θ modern {v_m} should beat damped legacy {v_l}"
+            (v195_m - 8.62).abs() < 1.5,
+            "MOND v(195) = {v195_m} left the force's circular speed"
         );
-        assert!(v_m > 6.0, "outer MOND speed {v_m} collapsed");
+        assert!(
+            (v195_n - 4.52).abs() < 1.2,
+            "Newtonian v(195) = {v195_n} left the Plummer circular speed"
+        );
+        let ratio_m = v195_m / v90_m;
+        let ratio_n = v195_n / v90_n;
+        assert!(
+            ratio_m > 0.85,
+            "MOND v(195)/v(90) = {ratio_m} fell like Kepler"
+        );
+        assert!(
+            ratio_n < 0.80,
+            "Newtonian v(195)/v(90) = {ratio_n} stayed flat"
+        );
+        // v(195)/v(52.5). The r ≈ 52 bin sits in the eye wall, so this ratio
+        // moves when that bin bounces; it still must not invert the two laws.
+        let wide_m = outer_inner_ratio(&sm);
+        let wide_n = outer_inner_ratio(&sn);
+        assert!(
+            wide_m > wide_n,
+            "MOND v(195)/v(52.5) = {wide_m} vs Newtonian {wide_n}"
+        );
+        assert!(
+            wide_n < 0.80,
+            "Newtonian v(195)/v(52.5) = {wide_n} did not fall"
+        );
     }
 }

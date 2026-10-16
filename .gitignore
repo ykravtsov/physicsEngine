@@ -1,2 +1,6 @@
 /target
 .DS_Store
+
+# Generated headless dumps (see analysis/plot_galaxy_review.py).
+# Docs figures live in docs/img/ and stay tracked.
+analysis/review_data/

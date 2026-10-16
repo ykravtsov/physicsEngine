@@ -52,63 +52,76 @@ The pieces that are easy to mistake for MOND:
 
 So the rotation curve is not flat for a specific, measured reason: the only radial force is Newtonian (Plummer), its circular-speed target falls with radius, and the 6%/s damping is four times stronger than the 1.5%/s restore, so stars do not even stay on that falling curve. At t = 0, `v_θ` matches `v_c(r)` from about 13.8 at r ≈ 8 down to 4.2 at r ≈ 250. At t = 40 s the same bins read 5.8, 2.9, 2.2, 1.5, 1.4.
 
-A MOND option is on by default on this branch (`--no-mond` turns it off, `M` toggles it while the window is open, `--a0` sets the scale). It uses the simple μ function, `a = a_N · (½ + √(¼ + a0/a_N))`, applied to the **core** Plummer field only. In code units the default `a0 = 1` gives a deep-MOND asymptote `v∞ = (GM · a0)^(1/4) ≈ 7.95`. That `a0` is not the SI value `1.2×10⁻¹⁰ m/s²`; the simulation is not in SI units, and nothing here converts it. With the viscosity pointed at the MOND circular speed instead of the Keplerian one, the measured curve at t = 40 s stays near that target (about 11 at r ≈ 40 and about 9 from r ≈ 90 out to r ≈ 200) instead of falling to ~1.4.
+A MOND option is on by default on this branch (`--no-mond` turns it off, `M` toggles it while the window is open, `--a0` sets the scale). It uses the simple μ function, `a = a_N · (½ + √(¼ + a0/a_N))`, applied to the **total Newtonian acceleration** `|a_core + a_BH|` after both Plummer terms are summed. `a_core` is evaluated at the star's 3D distance from the origin. `a_BH` is evaluated at the 3D separation from the black hole, and `|a_BH|` is capped at 8 before the sum. The vertical spring and the eyewall updraft are added after the boost and are not part of `a_N`. In the midplane, far from the black hole, this is the core alone. In code units the default `a0 = 1` gives a deep-MOND asymptote `v∞ = (GM · a0)^(1/4) ≈ 7.95`. That `a0` is not the SI value `1.2×10⁻¹⁰ m/s²`; the simulation is not in SI units, and nothing here converts it.
+
+Tangential velocity is not relaxed toward a prescribed circular speed. An earlier revision of this branch did that (`(v_target − v) · NU_ORBIT` with `NU_ORBIT = 1/s` and `v_target` the analytic MOND or Plummer speed). On a 1 s timescale that **imposed** the flat curve, which is why that revision reported `v(195)/v(52.5) = 0.88` glued to `v_M`. The term is gone. `force_circular_speed` is only the midplane circular speed of the core under the same boost, and it is used for the initial condition, respawn, and the high-speed drag threshold. The table below is what the accelerations do over 40 s.
 
 ---
 
 ## Measured rotation curve and thickness
 
-Headless, release build, 60 000 particles, seed 1, `dt = 1/60`, 40 s of simulation time. Legacy is `--legacy` (parent-branch forces and initial disk). "MOND + vortex" is the default on this branch (`a0 = 1`). "Vortex only" is `--no-mond`: same vertical structure and arm force, Newtonian radial force. Bins with fewer than ~50 stars are omitted. `v_N` is the Plummer circular speed at the bin center; `v_M` is the MOND circular speed at `a0 = 1`.
+Headless, release build, 60 000 particles, seed 1, `dt = 1/60`, 40 s of simulation time. Legacy is `--legacy` (parent-branch forces and initial disk). "MOND + vortex" is the default on this branch (`a0 = 1`). "Vortex only" is `--no-mond`: same vertical structure and arm force, Newtonian radial force. `v_N` is the Plummer circular speed at the bin center; `v_M` is the MOND circular speed of the **core in the midplane** at `a0 = 1`. Neither column is a velocity the integrator is steering toward.
+
+These numbers replace an earlier table from this branch in which `NU_ORBIT = 1/s` assigned `v_θ`. That table is withdrawn.
 
 ### Disk thickness, √⟨y²⟩
 
 | t (s) | legacy rms y | legacy p90 \|y\| | MOND+vortex rms y | MOND+vortex p90 \|y\| | vortex only rms y |
 |---:|---:|---:|---:|---:|---:|
 | 0 | 1.445 | 2.251 | 11.02 | 17.61 | 11.02 |
-| 5 | 0.328 | 0.509 | 14.65 | 22.52 | 14.80 |
-| 10 | 0.936 | 1.462 | 15.95 | 24.44 | 16.32 |
-| 20 | 0.455 | 0.700 | 14.23 | 21.85 | 14.00 |
-| 40 | **0.203** | **0.270** | **13.78** | **21.64** | 13.68 |
+| 5 | 0.328 | 0.509 | 14.71 | 22.61 | 14.86 |
+| 10 | 0.936 | 1.462 | 16.12 | 24.63 | 16.49 |
+| 20 | 0.456 | 0.700 | 13.92 | 21.58 | 13.45 |
+| 40 | **0.203** | **0.270** | **13.78** | **21.78** | **14.77** |
 
-The legacy spring-plus-damping collapses the sheet by a factor of about seven in 40 s. The non-monotonic wiggle (0.33 → 0.94 → 0.46) is the whole disk bouncing in phase: every star starts at `vy = 0`, so they all fall through `y = 0` together, and damping eats the bounce. The vortex run keeps an rms height of 11–16 because `vy` is seeded, the spring is softer (`k = 0.10`), vertical damping is a quarter of the in-plane rate, and the eye wall has an updraft.
+The legacy spring-plus-damping collapses the sheet by a factor of about seven in 40 s. The non-monotonic wiggle (0.33 → 0.94 → 0.46) is the whole disk bouncing in phase: every star starts at `vy = 0`, so they all fall through `y = 0` together, and damping eats the bounce. The vortex runs keep an rms height of 11–16 because `vy` is seeded, the spring is softer (`k = 0.10`), vertical damping is a quarter of the in-plane rate, and the eye wall has an updraft. Thickness does not depend on the MOND flag.
 
 ### Tangential speed v_θ(r)
 
-**t = 0.** Legacy sits on the Plummer curve. MOND+vortex sits on the MOND curve. Same seed, same angles; only the speed and the height differ.
+**t = 0.** Legacy sits on the Plummer curve. MOND+vortex sits on the MOND curve, because that is the initial condition (`sqrt(a_r · r)` of the force), not because anything is holding it there. Vortex-only uses the same positions as MOND+vortex and the Plummer speed. Same seed.
 
 | r | n (legacy) | legacy v_θ | v_N | MOND+vortex v_θ | v_M |
 |---:|---:|---:|---:|---:|---:|
-| 22.5 | 545 | 12.01 | 12.19 | 12.82 | 12.98 |
 | 52.5 | 1650 | 8.57 | 8.58 | 10.43 | 10.44 |
 | 90 | 4097 | 6.62 | 6.63 | 9.41 | 9.41 |
 | 150 | 13945 | 5.15 | 5.15 | 8.82 | 8.82 |
 | 195 | 23275 | 4.52 | 4.52 | 8.62 | 8.62 |
 
-**t = 40 s.**
+**t = 40 s.** Counts are in the 1 300–25 000 range for every bin below except the outermost, which the inflow has drained (the disk is born inside `r ≈ 229`, so the r = 250 bin is its inner edge).
 
 | r | legacy v_θ | legacy v_θ/v_N | MOND+vortex v_θ | v_M | vortex-only v_θ | vortex-only v_θ/v_N |
 |---:|---:|---:|---:|---:|---:|---:|
-| 52.5 | 2.94 | 0.34 | 10.34 | 10.44 | 8.60 | 1.00 |
-| 70 | 2.48 | 0.33 | 9.97 | 9.83 | 7.39 | 0.99 |
-| 90 | 2.24 | 0.34 | 9.07 | 9.41 | 6.50 | 0.98 |
-| 115 | 1.90 | 0.32 | 8.75 | 9.09 | 6.16 | 1.05 |
-| 150 | 1.53 | 0.30 | 9.09 | 8.82 | 5.30 | 1.03 |
-| 195 | 1.41 | 0.31 | 9.10 | 8.62 | 4.42 | 0.98 |
+| 52.5 | 2.93 | 0.34 | 8.64 | 10.44 | 7.98 | 0.93 |
+| 70 | 2.48 | 0.33 | 8.77 | 9.83 | 7.40 | 0.99 |
+| 90 | 2.24 | 0.34 | 9.38 | 9.41 | 6.75 | 1.02 |
+| 115 | 1.90 | 0.32 | 9.54 | 9.09 | 6.14 | 1.04 |
+| 150 | 1.53 | 0.30 | 9.52 | 8.82 | 5.42 | 1.05 |
+| 195 | 1.41 | 0.31 | 9.51 | 8.62 | 4.61 | 1.02 |
 
-Reading the three runs apart:
+`v(195) / v(52.5)` at t = 40 s:
 
-- Legacy falls, then sinks. `v(195) / v(52.5) = 0.48`, and both numbers are ~⅓ of Newtonian.
-- Vortex-only (Newtonian gravity, new damping) **holds the Plummer curve**: `v_θ/v_N ≈ 1` from r = 50 to r = 250, and the ratio `v(195)/v(52.5) = 0.51` is the Keplerian fall. Thickness is fixed by the vortex flag, not by MOND.
-- MOND+vortex holds `v_θ` within about 6% of `v_M` across that range. `v(195)/v(52.5) = 0.88`. The deep-MOND asymptote `(GM·a0)^(1/4) = 7.95` is the limit as `a_N ≪ a0`; at r = 195 the Plummer field is not that deep yet, so the target is 8.62 rather than 7.95. The measured 9.10 is that target, not a second mechanism.
+| run | measured | analytic midplane, same forces |
+|---|---:|---:|
+| legacy | **0.48** | 0.53, and then damping sinks both speeds |
+| vortex only (MOND off) | **0.58** | 0.53 |
+| MOND + vortex | **1.10** | 0.83 |
+
+Reading that honestly:
+
+- Legacy falls, then sinks. The ratio is 0.48, and both speeds are about a third of Newtonian. rms height is 0.20. This matches the parent-branch measurement (absorbed 415 stars, was 414; the respawn generator is now seeded and the mean did not move).
+- Vortex-only **falls**. From r = 70 to r = 195, `v_θ` stays within about 5% of the Plummer circular speed (4.61 against 4.52 at r = 195). The ratio 0.58 is the Keplerian decline. It is a little above the pure Plummer ratio 0.53 because the r = 52 bin sits in the eye wall (rms height 22 there) and runs slow, 7.98 against 8.58. Nothing in this run is pulling `v_θ` toward 4.52; the stars were born there and the Newtonian acceleration keeps them there.
+- MOND + vortex **does not fall**. From r = 90 to r = 195, `v_θ` sits between 9.38 and 9.54. The ratio 1.10 is flat, and slightly rising, which is flatter than the analytic MOND ratio 0.83. Two force-level reasons, not a velocity assignment: the r = 52 bin is slow (8.64 against the midplane MOND speed 10.44; same eye wall), and the outer disk runs hot (9.51 against 8.62 at r = 195, about 10%). A 1/s slave would have held 8.62. Inflow of higher-angular-momentum stars from the drained outer edge, the black hole, and the vertical bounce are enough to move the mean by that much over 40 s. The comparison that isolates the boost is the same vortex and the same seed with the flag flipped: outer speed 9.51 with MOND, 4.61 without.
+
+The deep-MOND asymptote `(GM · a0)^(1/4) = 7.95` is the limit `a_N ≪ a0`. At r = 195 the Plummer field is not that deep, so the midplane circular speed is 8.62, not 7.95. The measured 9.51 is above that, and this paragraph is the place that says so.
 
 Arm contrast, `(max − min) / (max + min)` of a 16-bin histogram of angular distance to the nearest of the two arms, for stars with `20 < r < 200`:
 
-| t (s) | legacy | MOND+vortex |
-|---:|---:|---:|
-| 0 | 0.909 | 0.908 |
-| 40 | 0.732 | 0.651 |
+| t (s) | legacy | MOND+vortex | vortex only |
+|---:|---:|---:|---:|
+| 0 | 0.909 | 0.908 | 0.908 |
+| 40 | 0.728 | 0.654 | 0.669 |
 
-Legacy's contrast stays a bit higher because the outer disk has nearly stopped moving (`v_θ ~ 1.4` at r = 195), so the initial spiral is frozen in place. The new run is actually orbiting (pattern speed 0.07 rad/s, orbital speeds ~9), and the arm force is deliberately weaker than the orbital restore so it cannot torque the curve off `v_M`. Contrast still drops, from 0.91 to 0.65 in 40 s. 0.65 is a peak-to-trough density ratio of about 4.7 in that histogram, which is a visible two-arm pattern, not a permanent grand-design lock. A stronger pinch (I tried `0.22` against a restore rate of `0.50`) spins the outer disk up toward solid-body `v = Ω_pattern · r` and the flat curve is gone. That tradeoff is left as a knob; see the last section.
+Legacy's contrast stays a bit higher because the outer disk has nearly stopped (`v_θ ≈ 1.4` at r = 195), so the initial spiral is frozen. The other two runs are orbiting. `PINCH_ARM` is `0.001/s`. At `0.02/s`, with no velocity slave to fight it, the pinch torqued a Newtonian disk from `v(195)/v(52.5) = 0.53` to `0.82` in 15 s, toward solid-body `Ω_pattern · r`. That is why the coefficient is small. Contrast still drops from 0.91 to about 0.65 in 40 s. The arms you still see are mostly the initial condition plus respawn onto the spiral, shearing, not a locked density wave.
 
 ![Rotation curve](docs/img/rotation_curve.png)
 
@@ -116,7 +129,7 @@ Legacy's contrast stays a bit higher because the outer disk has nearly stopped m
 
 ![Top-down and edge-on density](docs/img/morphology.png)
 
-Reproduce with `cargo run --release -- --headless ...` as in `analysis/plot_galaxy_review.py`. The CSVs are in `analysis/review_data/`.
+Reproduce with `cargo run --release -- --headless ...` as in `analysis/plot_galaxy_review.py`. The CSVs land in `analysis/review_data/` and are gitignored. The figures under `docs/img/` are the ones this file links.
 
 ---
 
@@ -128,7 +141,7 @@ Reproduce with `cargo run --release -- --headless ...` as in `analysis/plot_gala
 
 Viscosity accelerates velocity toward `v_c` at 0.015/s. Damping multiplies velocity by `1 − 0.06·dt`, i.e. `dv/dt = −0.06 v`. Setting the tangential derivative to zero gives `v = 0.20 v_c`, independent of the radial gravity. The comment says the 6%/s is there to stop stars spiralling *out* after black-hole kicks. In practice it removes the rotation the viscosity is trying to keep, and stars spiral *in*. The t = 40 s table is this equilibrium, approached with rate `NU + 0.06 = 0.075/s`: at t = 5 s, `v_θ/v_N` is already ~0.75, which is `0.20 + 0.80·e^(−0.075·5)`.
 
-**Fix:** drop the damping well below the restore rate, and point the restore at whatever circular speed you actually want (Plummer or MOND). This branch uses `DAMPING_RATE = 0.008` and `NU_ORBIT = 1.0` when not in `--legacy`. The high-speed extra drag (`src/galaxy.rs:383-391`) still catches slingshots. `--legacy` keeps 0.06 and 0.015.
+**Fix:** the non-legacy path drops the damping to `0.001/s` (about 4% of the speed over a 40 s run) and does not relax velocity toward a prescribed `v_c`. An intermediate revision used `NU_ORBIT = 1/s` toward the analytic circular speed; that imposed the curve and has been removed. The high-speed extra drag still catches slingshots, with the threshold taken from the midplane circular speed of the force as a reference, not as a target. `--legacy` keeps 0.06 and 0.015.
 
 ### 2. The two-arm spiral is unstable under its own restoring force
 
@@ -196,7 +209,7 @@ The code builds `rot_y = (cos ωΔt, 0, sin ωΔt, 0)` — full angle, not half-
 
 `src/simulation/hurricane.rs:110-118`: the comment says `F = 2Ω |v| v̂_perp`. `vel_perp = (−vy, vx)` already has length `|v|`, and it is multiplied by `CORIOLIS_RATE * |v|`, so the force scales as `|v|²`, i.e. one power of speed too many.
 
-The live galaxy "Coriolis" (`src/galaxy.rs:364-372`) is neither that nor `−2Ω × v`. It rotates the whole velocity vector about y by `0.06 · Ω_Kepler · dt`. For an already-tangential velocity that rotation tips it radially and slowly walks stars off circular orbits. It is small next to the 6%/s damping, which is why it does not dominate the measurement. It is still mislabeled, and it is still in both integrators. I left the quaternion sandwich in place so the step stays recognisable; it should be replaced with `a = −2Ω × v` or removed when you next touch that block.
+The live galaxy "Coriolis" (`src/galaxy.rs` in the parent, the legacy integrator on this branch) is neither that nor `−2Ω × v`. It rotates the whole velocity vector about y by `0.06 · Ω_Kepler · dt`. For an already-tangential velocity that rotation tips it radially and slowly walks stars off circular orbits. It is small next to the 6%/s damping, which is why it does not dominate the legacy measurement. It stays in `update_particles_legacy` so that baseline matches the parent. The non-legacy integrator does not apply it: left in, it was a second mechanism shifting `v_θ` on top of the forces.
 
 ---
 
@@ -236,21 +249,21 @@ The black hole feels the core and a linear drag (`src/galaxy.rs:284-305`) and do
 
 ### Two engines, one of which does not build
 
-`src/main.rs` compiles `engine`, `quaternion`, `hurricane_3d`, `galaxy`. `src/simulation/` and `src/physics/` are orphan source. `src/physics/math.rs` and `src/quaternion/math.rs` are two different `FluxQuaternion` types with the same name and overlapping `impl`s. The physics one is missing `rotate_vec3`, `conjugate`, and the camera helpers. Comments in the shader, the Bevy plugin and the CPU loop each claim to be "the" QDM-NS operator and they implement different forces (see the table in the MOND section). README.md:7-14 and the architecture tree at README.md:66-84 still describe the 50 000-particle hurricane and do not mention `src/galaxy.rs`, which is the program that launches.
+`src/main.rs` compiles `engine`, `quaternion`, `hurricane_3d`, `galaxy`. `src/simulation/` and `src/physics/` are orphan source. `src/physics/math.rs` and `src/quaternion/math.rs` are two different `FluxQuaternion` types with the same name and overlapping `impl`s. The physics one is missing `rotate_vec3`, `conjugate`, and the camera helpers. Comments in the shader, the Bevy plugin and the CPU loop each claim to be "the" QDM-NS operator and they implement different forces (see the table in the MOND section). README now points `cargo run` at `src/galaxy.rs`. The Bevy tree is still in the repo and still does not build.
 
-**Fix:** pick the CPU galaxy loop as the program (it already is), delete or feature-gate the Bevy tree once you have copied anything you still want out of it, and make README.md match `cargo run`. Not done in this branch beyond bug fixes in the shader and the gpu initialiser, so the dead code remains as documentation of the earlier attempts.
+**Fix:** delete or feature-gate the Bevy tree once you have copied anything you still want out of it. Not done in this branch beyond bug fixes in the shader and the gpu initialiser, so the dead code remains as documentation of the earlier attempts.
 
 ### `GalaxySimulation::update` clamps `dt` and then substeps, and the diagnostic divides by the wrong `n`
 
 `src/galaxy.rs:190-191` caps `dt` at 0.033 and takes two substeps. That is reasonable. `print_diagnostics` (`src/galaxy.rs:244-247`) divides `spd_sum` by `particles.len()` even when some particles were skipped as NaN, so a NaN contamination under-reports the mean. It also folds `y` into `r_min` / `r_max` via the spherical radius, so the printed radial range is not the cylindrical one the forces use. The headless sampler on this branch reports cylindrical bins separately.
 
-### Respawn and the per-step `thread_rng` make a run unreproducible
+### Respawn used to draw from `thread_rng`
 
-`src/galaxy.rs:309` builds a new `thread_rng` inside the particle step. The headless path seeds initialisation (`--seed`) but respawn still draws from `thread_rng`. Fine for a 60 000-particle mean; awkward if you ever want a bitwise regression test of a long run. The unit test on this branch checks thickness and outer speed with wide bounds rather than exact positions.
+`src/galaxy.rs:309` on the parent built a new `thread_rng` inside the particle step. The headless path seeded initialisation (`--seed`) and respawn ignored it. This branch keeps one `StdRng` on the simulation, seeded from `--seed` / `with_config(..., Some(seed))`, and both integrators draw respawn from it. The unit test checks thickness and the MOND-versus-Newtonian ratio with wide bounds rather than exact positions.
 
 ### The velocity state is a quaternion that is almost always used as three floats
 
-`FluxQuaternion` is the right type for the camera (`q v q⁻¹` in `src/quaternion/math.rs:75-82`, and it is tested). In the galaxy step the Hamilton product is used once, for the mislabeled Coriolis rotation. Every other update writes `flux.x/y/z` directly. `flux.w` is overwritten from `v_c / MAX_SPEED` (`src/galaxy.rs:393-394`) and never read back by the force law, so the "pressure" component is a color hint, not a pressure. That is consistent with THEORY.md §4 ("a visualisation driven by forces chosen to represent each term"). The risk is comments that describe those writes as `ν∇²Ψ` or `Ψ̄·J`. A reader who trusts the comment will think the operator is being integrated. The comment on the viscosity block should say "relax velocity toward `v_c`", which is what the arithmetic does.
+`FluxQuaternion` is the right type for the camera (`q v q⁻¹` in `src/quaternion/math.rs:75-82`, and it is tested). In the legacy galaxy step the Hamilton product is used once, for the mislabeled Coriolis rotation. The non-legacy step does not use it: every update writes `flux.x/y/z` directly. `flux.w` is overwritten from the midplane circular speed over `MAX_SPEED` and never read back by the force law, so the "pressure" component is a color hint, not a pressure. That is consistent with THEORY.md §4 ("a visualisation driven by forces chosen to represent each term"). The risk is comments that describe those writes as `ν∇²Ψ` or `Ψ̄·J`. The non-legacy integrator's comments name the accelerations (Plummer, MOND boost, inflow, pinch) rather than the operator terms.
 
 ---
 
@@ -262,7 +275,7 @@ What will hurt the window:
 
 - `ParticleRenderer::render` allocates a `Vec<ParticleVertex>` and copies every particle to the GPU every frame (`src/hurricane_3d/renderer.rs:175-186`). 60 000 × 32 bytes is small, but the allocation is on the hot path. A retained `Vec` reused across frames, or a storage buffer updated by the compute pass you already sketched, removes it.
 - The diagnostic `println` every 300 frames (`src/galaxy.rs:198-200`) formats a multi-line string under the frame budget. Fine at 5 s intervals; noisy if a hitch makes `frame` jump.
-- `rand::thread_rng()` inside the particle loop takes a lock. At 60 000 × 2 substeps it shows up once stars start respawning. A small `StdRng` owned by the simulation avoids that.
+- `rand::thread_rng()` inside the particle loop took a lock on the parent. Respawn now uses the simulation's `StdRng`.
 - The shader path, if you turn it on at 100 000 particles, does a quaternion sandwich per particle per frame with no spatial culling. That is still cheap on a GPU. The expensive bug there is numerical (the λ brake), not the workgroup size.
 
 No change to the renderer allocation in this branch. The physics change is a few extra multiplies per star.
@@ -292,24 +305,24 @@ All of it is in the CPU galaxy loop, the camera, the headless sampler, and two u
 | Flag | Default | Effect |
 |---|---|---|
 | `--legacy` | off | Parent-branch integrator. Ignores the three flags below. |
-| `--mond` / `--no-mond` | on | Simple MOND boost on the core Plummer acceleration. `M` toggles this in the window. |
+| `--mond` / `--no-mond` | on | Simple MOND boost on `\|a_core + a_BH\|` (3D distances). `M` toggles this in the window. |
 | `--a0 <float>` | 1 | Code-unit `a0`. `v∞ = (4000 · a0)^(1/4)`. |
-| `--vortex` / `--no-vortex` | on | Flared layer, seeded `vy`, softer spring, weaker vertical damping, 3.5% inflow, eye-wall updraft, `sin(2·phase)` arm force with pattern speed 0.07 rad/s. |
-| `--headless --seconds --particles --seed --out --snapshot-dir` | — | No window. Writes the rotation-curve CSV. |
+| `--vortex` / `--no-vortex` | on | Flared layer, seeded `vy`, softer spring, weaker vertical damping, inflow acceleration `0.035 v_c²/r`, eye-wall updraft, `sin(2·phase)` arm force (`PINCH_ARM = 0.001/s`) with pattern speed 0.07 rad/s. |
+| `--headless --seconds --particles --seed --out --snapshot-dir` | — | No window. Writes the rotation-curve CSV. `--seed` covers init and respawn. |
 
-Also: orbital damping 0.008/s and restore 1.0/s (so `v_θ` can actually sit on the target), the black-hole cap applied to `|a|`, cylindrical escape test, camera `look_at`, shader jet axis and recycle test, shader `φ₀ = 2π/φ²`, shader λ brake normalised by `15²`, and the Bevy initialiser no longer writes `φ₀ ln r` into `vy`.
+Also: in-plane damping `0.001/s` and **no** relaxation of `v` toward a target speed, the `0.06·Ω` velocity twist removed from the non-legacy step, the black-hole cap applied to `|a|` before the MOND boost, cylindrical escape test, camera `look_at`, shader jet axis and recycle test, shader `φ₀ = 2π/φ²`, shader λ brake normalised by `15²`, and the Bevy initialiser no longer writes `φ₀ ln r` into `vy`.
 
-`cargo test --release` covers the MOND limits (`a → a_N` and `a → √(a_N a0)`), the deep-MOND asymptote `v⁴ → GM a0` at r = 5000, `look_at`, and a short dynamics check that the vortex disk stays thicker than the legacy sheet and that the outer MOND speed stays above the damped legacy speed. `cargo build --release` is clean.
+`cargo test --release` covers the MOND limits (`a → a_N` and `a → √(a_N a0)`), the deep-MOND asymptote `v⁴ → GM a0` at r = 5000, `look_at`, a check that a star at rest is not snapped to `v_c` in one second, and a 10 s dynamics check that the vortex disk stays thicker than the legacy sheet and that `v(195)/v(90)` stays high with MOND and falls without it. `cargo build --release` and `cargo clippy --release -- -D warnings` are clean.
 
 ---
 
 ## Left for you to decide
 
 - **Is `a0 = 1` the right code-unit scale?** It puts the Newtonian-to-MOND transition near r ≈ 60, and `v∞ ≈ 8`. Your SI `a0` does not plug in until positions and `GM` are in meters and seconds. `--a0` is there so you can move the break.
-- **MOND is only on the core.** The black hole is still Newtonian, and the boost uses the simple μ function rather than the standard one. The viscosity target is the circular speed of that boosted core, in the plane. Stars far out of the plane are still aimed at the in-plane `v_c`, which is why the eye wall runs slightly hot (at r = 70, `v_θ = 9.97` against `v_M = 9.83`).
-- **Arms versus a flat curve.** Contrast fell from 0.91 to 0.65 in 40 s. Raising `PINCH_ARM` holds the arms and pulls `v(r)` toward `Ω_pattern · r`, which is solid-body, not MOND. A lasting two-arm pattern with a flat curve needs a density wave whose torque averages to ~0, or self-gravity, which this loop does not have. I would not turn the pinch up to hide that.
-- **The eye.** `BH_ABSORB_R = 15` plus the updraft leaves the region r ≲ 30 almost empty and the ring outside it thicker (`rms y` in the r = 70 bin is ~24 at t = 40 s, against ~11 in the outer disk). That is the hurricane eye you described. It is not a bright stellar bulge. If you want both, the core needs a population that is not deleted at r = 15 and is not in the updraft.
-- **Inflow `0.035 v_c`** is a slow drain (roughly 10–15 code units of radius in 40 s), on purpose, so streamlines are spirals. Set it to 0 if you want a closed disk.
+- **Where MOND is applied.** The boost multiplies `|a_core + a_BH|`, both pieces at 3D distance, and it does not multiply the spring or the updraft. The interpolating function is the simple μ, not the standard one. The outer disk at t = 40 s runs about 10% above the midplane core circular speed (9.51 against 8.62 at r = 195). That offset is migration and the vertical bounce, not a second boost, and it is not held there by a drag toward `v_M`.
+- **Arms versus a flat curve.** Contrast fell from 0.91 to 0.65 in 40 s with `PINCH_ARM = 0.001`. At `0.02` the same pinch, with nothing pulling `v` back, rewrote a Newtonian curve toward `Ω_pattern · r` inside 15 s. A lasting two-arm pattern with a flat curve needs a density wave whose torque averages to ~0, or self-gravity, which this loop does not have.
+- **The eye.** `BH_ABSORB_R = 15` plus the updraft leaves the region r ≲ 30 almost empty and the ring outside it thicker (at t = 40 s the r = 70 bin has rms height about 21 with MOND and about 26 without, against about 12 in the outer disk). That is the hurricane eye you described. It is not a bright stellar bulge. The r = 52 bin is inside that wall, which is why `v(195)/v(52.5)` is a slightly dirty summary of the curve; the r = 90 to r = 195 stretch is the clean one.
+- **Inflow** is an inward acceleration `0.035 · v_c² / r`, plus an initial `v_r = −0.035 v_c`. Over 40 s that drains the outer edge (the r = 250 bin goes from ~4 700 stars to empty) and is part of why the MOND outer disk runs hot. Set `INFLOW_FRAC` to 0 for a closed disk.
 - **The shader and Bevy paths** still have no radial gravity, and `src/simulation/galaxy.rs` still left-multiplies the quaternion. I fixed the bugs that fire on the first frame (jet axis, `φ₀`, `|Ψ|²`, `vel.y`). I did not try to make that path a second galaxy.
-- **README.md** still says the quaternion algebra fixes the units and that flat curves come from Lorentz support. THEORY.md §3 and §4 are the accurate statement. I did not rewrite the README.
+- **README.md** now describes the galaxy program, the `M` key, and `--headless`. The quaternion-algebra claim that the units match by themselves, and that the running pinch produces flat curves, is no longer stated as a fact about this integrator. THEORY.md §3 and §4 remain the write-up of the operator.
 - **Rendering** is still 1-pixel points, no depth. The edge-on histogram in `docs/img/morphology.png` is ahead of what the window can show until points have a size and a depth test.

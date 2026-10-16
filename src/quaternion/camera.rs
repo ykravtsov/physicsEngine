@@ -94,7 +94,8 @@ impl QuaternionCamera {
         let uy = backz * rx - backx * rz;
         let uz = backx * ry - backy * rx;
 
-        self.orientation = quat_from_basis(rx, ry, rz, ux, uy, uz, backx, backy, backz).normalize();
+        self.orientation =
+            quat_from_basis([rx, ry, rz], [ux, uy, uz], [backx, backy, backz]).normalize();
     }
 
     /// Build the view matrix for the GPU (the ONLY matrix in the engine)
@@ -104,20 +105,10 @@ impl QuaternionCamera {
 }
 
 /// Quaternion that maps the local axes onto the three world vectors (columns).
-fn quat_from_basis(
-    rx: f32,
-    ry: f32,
-    rz: f32,
-    ux: f32,
-    uy: f32,
-    uz: f32,
-    bx: f32,
-    by: f32,
-    bz: f32,
-) -> FluxQuaternion {
-    let (m00, m01, m02) = (rx, ux, bx);
-    let (m10, m11, m12) = (ry, uy, by);
-    let (m20, m21, m22) = (rz, uz, bz);
+fn quat_from_basis(right: [f32; 3], up: [f32; 3], back: [f32; 3]) -> FluxQuaternion {
+    let (m00, m10, m20) = (right[0], right[1], right[2]);
+    let (m01, m11, m21) = (up[0], up[1], up[2]);
+    let (m02, m12, m22) = (back[0], back[1], back[2]);
     let trace = m00 + m11 + m22;
     if trace > 0.0 {
         let s = (trace + 1.0).sqrt() * 2.0;

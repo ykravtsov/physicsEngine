@@ -49,10 +49,10 @@ fn parse(args: &[String]) -> HeadlessArgs {
 
 pub fn run(args: &[String]) {
     let args = parse(args);
-    if let Some(parent) = Path::new(&args.out).parent() {
-        if !parent.as_os_str().is_empty() {
-            let _ = fs::create_dir_all(parent);
-        }
+    if let Some(parent) = Path::new(&args.out).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        let _ = fs::create_dir_all(parent);
     }
     if let Some(dir) = &args.snapshot_dir {
         let _ = fs::create_dir_all(dir);
