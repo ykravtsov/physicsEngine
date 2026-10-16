@@ -1,8 +1,10 @@
 # QDM-NS Galaxy
 
-`cargo run` opens a 60,000-particle galaxy. The integrator is the CPU loop in [`src/galaxy.rs`](src/galaxy.rs): a fixed Plummer core, a light black hole on a dragging orbit, and a flared disk wound into a two-arm logarithmic spiral. The window title is `QDM-NS Galaxy — Black Hole Through Space Fluid`.
+`cargo run` opens a spiral galaxy on the GPU: by default **1,048,576** stars, integrated in a compute shader and drawn as soft glowing sprites with HDR bloom. The force law is the same one as the CPU loop in [`src/galaxy.rs`](src/galaxy.rs): a fixed Plummer core, a light black hole on a dragging orbit, a MOND boost on `|a_core + a_BH|`, and a flared disk wound into a two-arm logarithmic spiral. `--cpu` integrates that loop on the CPU and only uses the GPU to draw. `--headless` is the older CPU sampler and does not open a window.
 
-The equations the model is aiming at are in [THEORY.md](THEORY.md). What this loop integrates, and the measurements behind the table below, are in [REVIEW.md](REVIEW.md).
+The equations the model is aiming at are in [THEORY.md](THEORY.md). What the loop integrates, and the 60,000-particle measurements behind the table below, are in [REVIEW.md](REVIEW.md).
+
+![GPU galaxy, 1,048,576 stars, 18° orbit](docs/img/galaxy_gpu.png)
 
 ## Forces
 
@@ -54,31 +56,66 @@ Headless release run, 60,000 particles, seed 1, `dt = 1/60`, 40 s. `v_N` and `v_
 
 With MOND off, speed from r ≈ 70 outward stays on the falling Plummer curve. With MOND on, v_θ from r ≈ 90 to r ≈ 195 stays between 9.4 and 9.5. The ratio 1.10 is flatter than the analytic midplane ratio 0.83, because the r ≈ 52 bin sits in the eye wall and runs slow, and the outer disk runs about 10% above 8.62. Full bins and plots are in [REVIEW.md](REVIEW.md).
 
-## Controls
+## Window
 
-| Key | Action |
+The default camera is an orbit, tilted **18°** from face-on, distance 820, looking at `(0, 4, 0)`. Yaw, tilt, and distance ease toward the target each frame. Sprites are camera-facing quads in clip space, a few pixels across, larger near the core and when the camera moves in. They blend additively into an HDR buffer. A bright-pass and three Kawase blurs feed a Reinhard composite. One star in eight is a faint dust lane, drawn behind the arms and used as a soft extinction mask. `--no-dust` turns that mask off.
+
+Color runs from a warm gold core to blue in the outer arms, brighter where the star is faster and where it sits on the spiral.
+
+| Input | Action |
 |---|---|
-| `W` / `S` | Fly forward / back |
-| `A` / `D` | Fly left / right |
-| `Space` / `Shift` | Fly up / down |
-| Mouse | Look (cursor is grabbed) |
+| Left drag | Orbit yaw and tilt |
+| Scroll, `W` / `S` | Zoom |
+| `A` / `D` | Yaw |
+| `Q` / `E` | Tilt |
+| `R` | Reset the orbit |
 | `M` | Toggle MOND |
 | `Escape` | Quit |
 
-The camera starts at `(200, 480, 300)`, looking at `(0, 8, 0)`.
+| Flag | Default | Effect |
+|---|---|---|
+| `--stars <n>` | 1048576 | Particle count. Values under 64 are raised to 64. |
+| `--cpu` | off | Integrate in `galaxy.rs` and upload the buffer each frame. Slow at a million stars; `--stars 60000` is the useful CPU size. |
+| `--seed <u64>` | 1 | Initial disk. GPU respawn uses a hash of index, seed, and frame, so a single respawn does not match the CPU `StdRng`, and the binned curve still does. |
+| `--no-dust` | dust on | Skip the dust-lane mask. |
+| `--shot <path>` | | Write one offscreen PNG and exit. No window. |
+| `--benchmark <frames>` | | Print compute-only fps and full-frame fps, then exit. |
+| `--width` / `--height` | 1280×720 | Offscreen size. The window uses the same numbers as its initial size. |
+
+`--no-mond`, `--a0`, `--vortex`, `--no-vortex`, and `--legacy` apply to both the GPU kernel and `--cpu`.
+
+On llvmpipe (software Vulkan, no discrete GPU in this environment) at 1,048,576 stars and 1280×720 the compute shader ran at about **52 fps** (19 ms). A full frame, including the sprite and bloom passes, was about **1.3 fps** (780 ms). The sprites are the fill-rate cost; a hardware GPU is what that pass is sized for.
+
+## GPU and CPU agree
+
+`gpu_kernel_matches_cpu_curve_and_thickness` spawns 4096 stars from the same seed, steps both integrators for 3 s at `dt = 1/60`, and compares `curve_check` (v_θ in the r = 45–60 and r = 170–220 bins, plus rms height). Release, seed 11, llvmpipe:
+
+| | ratio v(195)/v(52) | v_θ(195) | rms y |
+|---|---:|---:|---:|
+| MOND CPU | 0.8233 | 8.685 | 11.692 |
+| MOND GPU | 0.8233 | 8.685 | 11.695 |
+| Newtonian CPU | 0.5270 | 4.521 | 11.766 |
+| Newtonian GPU | 0.5269 | 4.521 | 11.765 |
+
+That is well inside a few percent (the outer-bin counts differed by 2 stars in the Newtonian run). The 40 s, 60,000-star curves above remain the CPU reference; the GPU kernel is the same force order, including `--legacy`.
 
 ## Build and run
 
-Rust **1.88** or newer. The crate is `edition = "2024"` and `Cargo.toml` sets `rust-version = "1.88"`. The window needs a GPU and a display. `--headless` does not.
+Rust **1.88** or newer. The crate is `edition = "2024"` and `Cargo.toml` sets `rust-version = "1.88"`. The window needs a GPU (or lavapipe) and a display. `--headless`, `--shot`, and `--benchmark` do not.
 
 ```bash
 cargo build --release
 cargo run --release
 
+cargo run --release -- --stars 1048576
 cargo run --release -- --no-mond
 cargo run --release -- --a0 0.3
 cargo run --release -- --no-vortex
 cargo run --release -- --legacy
+cargo run --release -- --cpu --stars 60000
+
+cargo run --release -- --shot docs/img/galaxy_gpu.png --stars 1048576
+cargo run --release -- --benchmark 30 --stars 1048576
 ```
 
 ### Headless
@@ -115,32 +152,35 @@ cargo clippy --release -- -D warnings
 ## What is compiled
 
 ```
-src/main.rs            window loop, or --headless
-src/galaxy.rs          force law
-src/headless.rs        rotation-curve sampler
-src/engine/            wgpu device and keyboard state
-src/quaternion/        FluxQuaternion and the fly camera
-src/hurricane_3d/      particle struct and the point-sprite renderer
-assets/shaders/particle3d.wgsl
+src/main.rs                         window, or --shot / --benchmark / --headless
+src/galaxy.rs                       CPU force law (also the --cpu path)
+src/gpu_galaxy.rs                   wgpu compute, sprites, bloom, orbit camera
+src/headless.rs                     CPU rotation-curve sampler
+assets/shaders/galaxy_compute.wgsl  port of update_particles and the legacy step
+assets/shaders/galaxy_sprite.wgsl   soft point sprites
+assets/shaders/galaxy_bloom.wgsl    bright-pass, Kawase blur, tonemap
+src/quaternion/                     FluxQuaternion; look_at builds the view matrix
+src/hurricane_3d/                   particle struct. The old 1 px renderer is not used
 ```
 
-The camera is a quaternion (`q v q⁻¹`). The one matrix in the frame is the view-projection matrix built from that quaternion for wgpu. A star's velocity is the vector part of a `FluxQuaternion`; the force law writes `x`, `y`, and `z` directly, and stores a speed hint in `w` for color.
+The camera orientation is still a quaternion (`q v q⁻¹`). The view and projection matrices are the pair the sprite shader multiplies. A star's velocity is the vector part of a `FluxQuaternion` on the CPU; the GPU buffer stores `pos.xyz`, a dust flag in `pos.w`, and `vel.xyzw`.
 
 ## Still unwired
 
 `bevy` is commented out in `Cargo.toml`. `main.rs` does not declare `mod simulation` or `mod physics`, so none of the following is compiled or stepped:
 
-- `src/simulation/` — an older Bevy galaxy, including the GPU compute update and the atmospheric hurricane
+- `src/simulation/` — an older Bevy galaxy and its compute update
 - `src/physics/` — a second `FluxQuaternion`
-- `assets/shaders/galaxy_sim.wgsl`, `ether_compute.wgsl`, `gpu_galaxy_render.wgsl` — shaders for that path
+- `assets/shaders/galaxy_sim.wgsl`, `ether_compute.wgsl`, `gpu_galaxy_render.wgsl`, `particle3d.wgsl` — shaders for those older paths
 
-The live view is 1-pixel points, additive blending, no depth buffer (`src/hurricane_3d/renderer.rs`, `assets/shaders/particle3d.wgsl`).
+The live GPU kernel is `galaxy_compute.wgsl`, written against `src/galaxy.rs`, not `galaxy_sim.wgsl`.
 
 ## Dependencies
 
 - `winit` 0.30 — window and input
-- `wgpu` 22 — GPU rendering
+- `wgpu` 22 — compute and the sprite/bloom passes
 - `bytemuck` — buffer casts
 - `pollster` — GPU init
-- `rand` 0.8 — disk initialisation and respawn
+- `png` 0.17 — `--shot`
+- `rand` 0.8 — disk initialisation and CPU respawn
 - `env_logger` / `log`

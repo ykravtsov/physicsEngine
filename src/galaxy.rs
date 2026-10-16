@@ -510,6 +510,24 @@ impl GalaxySimulation {
         );
     }
 
+    /// Pattern speed and black-hole motion, without touching stars.
+    /// The GPU integrator calls this once per substep so the perturber matches
+    /// `update`, then integrates stars in the compute shader.
+    pub fn advance_perturber(&mut self, dt: f32) {
+        if !self.config.legacy {
+            self.pattern_angle += PATTERN_OMEGA * dt;
+        }
+        self.update_black_hole(dt);
+    }
+
+    pub fn pattern_angle(&self) -> f32 {
+        self.pattern_angle
+    }
+
+    pub fn black_hole_xyz(&self) -> [f32; 3] {
+        [self.black_hole.x, self.black_hole.y, self.black_hole.z]
+    }
+
     fn step(&mut self, dt: f32) {
         if !self.config.legacy {
             self.pattern_angle += PATTERN_OMEGA * dt;
@@ -1027,6 +1045,56 @@ impl GalaxySimulation {
             n: self.particles.len(),
             bins,
         }
+    }
+}
+
+/// Binned tangential speed at r ≈ 52.5 and r ≈ 195, plus disk rms height.
+/// Shared by the CPU `stats` path's tests and the GPU parity check.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct CurveCheck {
+    pub v_52: f32,
+    pub v_195: f32,
+    pub ratio: f32,
+    pub rms_y: f32,
+    pub n_52: u32,
+    pub n_195: u32,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn curve_check(samples: impl IntoIterator<Item = ([f32; 3], [f32; 3])>) -> CurveCheck {
+    let mut n = 0u32;
+    let mut y2 = 0.0f32;
+    let mut n52 = 0u32;
+    let mut n195 = 0u32;
+    let mut vt52 = 0.0f32;
+    let mut vt195 = 0.0f32;
+    for (p, v) in samples {
+        n += 1;
+        y2 += p[1] * p[1];
+        let r = (p[0] * p[0] + p[2] * p[2]).sqrt().max(1e-4);
+        let tx = -p[2] / r;
+        let tz = p[0] / r;
+        let vt = v[0] * tx + v[2] * tz;
+        if (45.0..60.0).contains(&r) {
+            n52 += 1;
+            vt52 += vt;
+        } else if (170.0..220.0).contains(&r) {
+            n195 += 1;
+            vt195 += vt;
+        }
+    }
+    let v_52 = if n52 > 0 { vt52 / n52 as f32 } else { 0.0 };
+    let v_195 = if n195 > 0 { vt195 / n195 as f32 } else { 0.0 };
+    let ratio = if v_52.abs() > 1e-3 { v_195 / v_52 } else { 0.0 };
+    let rms_y = if n > 0 { (y2 / n as f32).sqrt() } else { 0.0 };
+    CurveCheck {
+        v_52,
+        v_195,
+        ratio,
+        rms_y,
+        n_52: n52,
+        n_195: n195,
     }
 }
 
