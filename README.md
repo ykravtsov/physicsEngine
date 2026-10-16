@@ -153,27 +153,19 @@ cargo clippy --release -- -D warnings
 
 ```
 src/main.rs                         window, or --shot / --benchmark / --headless
-src/galaxy.rs                       CPU force law (also the --cpu path)
+src/galaxy.rs                       CPU force law, particle struct, and the --cpu path
 src/gpu_galaxy.rs                   wgpu compute, sprites, bloom, orbit camera
 src/headless.rs                     CPU rotation-curve sampler
-assets/shaders/galaxy_compute.wgsl  port of update_particles and the legacy step
-assets/shaders/galaxy_sprite.wgsl   soft point sprites
-assets/shaders/galaxy_bloom.wgsl    bright-pass, Kawase blur, tonemap
 src/quaternion/                     FluxQuaternion; look_at builds the view matrix
-src/hurricane_3d/                   particle struct. The old 1 px renderer is not used
+src/engine/                         keyboard state
+assets/shaders/galaxy_compute.wgsl  port of update_particles and the legacy step
+assets/shaders/galaxy_sprite.wgsl   soft point sprites (color is computed here)
+assets/shaders/galaxy_bloom.wgsl    bright-pass, Kawase blur, tonemap
 ```
 
-The camera orientation is still a quaternion (`q v q⁻¹`). The view and projection matrices are the pair the sprite shader multiplies. A star's velocity is the vector part of a `FluxQuaternion` on the CPU; the GPU buffer stores `pos.xyz`, a dust flag in `pos.w`, and `vel.xyzw`.
+The camera orientation is a quaternion (`q v q⁻¹`). The view and projection matrices are the pair the sprite shader multiplies. A star's velocity is the vector part of a `FluxQuaternion` on the CPU; the GPU buffer stores `pos.xyz`, a dust flag in `pos.w`, and `vel.xyzw`.
 
-## Still unwired
-
-`bevy` is commented out in `Cargo.toml`. `main.rs` does not declare `mod simulation` or `mod physics`, so none of the following is compiled or stepped:
-
-- `src/simulation/` — an older Bevy galaxy and its compute update
-- `src/physics/` — a second `FluxQuaternion`
-- `assets/shaders/galaxy_sim.wgsl`, `ether_compute.wgsl`, `gpu_galaxy_render.wgsl`, `particle3d.wgsl` — shaders for those older paths
-
-The live GPU kernel is `galaxy_compute.wgsl`, written against `src/galaxy.rs`, not `galaxy_sim.wgsl`.
+The older Bevy galaxy (`src/simulation/`, including its debug gizmo), the second `FluxQuaternion` in `src/physics/`, the 1-pixel point renderer, and the shaders that belonged to those paths have been removed. They implemented a different force law from `src/galaxy.rs`. [REVIEW.md](REVIEW.md) and [THEORY.md](THEORY.md) still describe that older code as it was when those notes were written.
 
 ## Dependencies
 

@@ -2,7 +2,6 @@ mod engine;
 mod galaxy;
 mod gpu_galaxy;
 mod headless;
-mod hurricane_3d;
 mod quaternion;
 
 use engine::input::InputState;
@@ -133,7 +132,6 @@ async fn run(launch: Launch) {
                         app.orbit_keys(dt, yaw, tilt, zoom);
                         app.step(dt);
                         app.render_surface();
-                        input.reset_frame();
                         window.request_redraw();
                     }
                     _ => {}
