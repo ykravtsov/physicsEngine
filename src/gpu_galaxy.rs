@@ -105,7 +105,7 @@ fn arg_u64(args: &[String], flag: &str) -> Option<u64> {
     arg_str(args, flag).and_then(|s| s.parse().ok())
 }
 
-struct Orbit {
+struct CameraControls {
     yaw: f32,
     tilt: f32,
     dist: f32,
@@ -113,9 +113,10 @@ struct Orbit {
     tilt_t: f32,
     dist_t: f32,
     dragging: bool,
+    flight: Option<QuaternionCamera>,
 }
 
-impl Orbit {
+impl CameraControls {
     fn new() -> Self {
         let tilt = 18.0_f32.to_radians();
         let dist = 820.0;
@@ -127,14 +128,62 @@ impl Orbit {
             tilt_t: tilt,
             dist_t: dist,
             dragging: false,
+            flight: None,
         }
     }
 
     fn reset(&mut self) {
-        *self = Self::new();
+        let default = Self::new();
+        self.yaw_t = default.yaw;
+        self.tilt_t = default.tilt;
+        self.dist_t = default.dist;
+        if self.flight.is_some() {
+            self.yaw = default.yaw;
+            self.tilt = default.tilt;
+            self.dist = default.dist;
+            self.flight = Some(default.camera());
+        }
+    }
+
+    fn toggle_flight(&mut self) -> bool {
+        self.flight = if self.flight.is_some() {
+            None
+        } else {
+            Some(self.camera())
+        };
+        self.dragging = false;
+        self.flight.is_some()
+    }
+
+    fn drag(&mut self, dx: f32, dy: f32) {
+        if let Some(camera) = &mut self.flight {
+            camera.mouse_look(dx, dy);
+        } else {
+            self.yaw_t += dx * 0.005;
+            self.tilt_t = (self.tilt_t + dy * 0.004).clamp(0.08, 1.35);
+        }
+    }
+
+    fn zoom(&mut self, steps: f32) {
+        if self.flight.is_none() {
+            self.dist_t = (self.dist_t * (-steps * 0.12).exp()).clamp(240.0, 2600.0);
+        }
+    }
+
+    fn keys(&mut self, dt: f32, right: f32, up: f32, forward: f32) {
+        if let Some(camera) = &mut self.flight {
+            camera.fly(dt.min(0.25), right, up, forward);
+        } else {
+            self.yaw_t += right * 0.7 * dt;
+            self.tilt_t = (self.tilt_t + up * 0.45 * dt).clamp(0.08, 1.35);
+            self.dist_t = (self.dist_t * (-forward * 0.65 * dt).exp()).clamp(240.0, 2600.0);
+        }
     }
 
     fn smooth(&mut self, dt: f32) {
+        if self.flight.is_some() {
+            return;
+        }
         let k = 1.0 - (-12.0 * dt).exp();
         self.yaw += (self.yaw_t - self.yaw) * k;
         self.tilt += (self.tilt_t - self.tilt) * k;
@@ -145,6 +194,15 @@ impl Orbit {
         let h = self.dist * self.tilt.sin();
         let y = self.dist * self.tilt.cos();
         (h * self.yaw.sin(), y, h * self.yaw.cos())
+    }
+
+    fn camera(&self) -> QuaternionCamera {
+        self.flight.unwrap_or_else(|| {
+            let (x, y, z) = self.eye();
+            let mut camera = QuaternionCamera::new(x, y, z);
+            camera.look_at(0.0, 4.0, 0.0);
+            camera
+        })
     }
 }
 
@@ -194,7 +252,7 @@ pub struct GalaxyApp {
     dust: bool,
     pub cpu: bool,
     sim: GalaxySimulation,
-    orbit: Orbit,
+    controls: CameraControls,
     compute_pipeline: ComputePipeline,
     compute_bg: BindGroup,
     sprite_pipeline: RenderPipeline,
@@ -599,7 +657,7 @@ impl GalaxyApp {
             dust: launch.dust,
             cpu: launch.cpu,
             sim,
-            orbit: Orbit::new(),
+            controls: CameraControls::new(),
             compute_pipeline,
             compute_bg,
             sprite_pipeline,
@@ -796,39 +854,42 @@ impl GalaxyApp {
         self.set_mond(on);
     }
 
-    pub fn orbit_drag(&mut self, dx: f32, dy: f32) {
-        self.orbit.yaw_t += dx * 0.005;
-        self.orbit.tilt_t = (self.orbit.tilt_t + dy * 0.004).clamp(0.08, 1.35);
+    pub fn camera_drag(&mut self, dx: f32, dy: f32) {
+        self.controls.drag(dx, dy);
     }
 
-    pub fn orbit_zoom(&mut self, steps: f32) {
-        self.orbit.dist_t = (self.orbit.dist_t * (1.0 - steps * 0.12)).clamp(240.0, 2600.0);
+    pub fn camera_zoom(&mut self, steps: f32) {
+        self.controls.zoom(steps);
     }
 
-    pub fn orbit_keys(&mut self, dt: f32, yaw: f32, tilt: f32, zoom: f32) {
-        self.orbit.yaw_t += yaw * dt;
-        self.orbit.tilt_t = (self.orbit.tilt_t + tilt * dt).clamp(0.08, 1.35);
-        if zoom != 0.0 {
-            self.orbit.dist_t = (self.orbit.dist_t * (1.0 - zoom * dt)).clamp(240.0, 2600.0);
-        }
+    pub fn navigate(&mut self, dt: f32, right: f32, up: f32, forward: f32) {
+        self.controls.keys(dt, right, up, forward);
     }
 
-    pub fn reset_orbit(&mut self) {
-        self.orbit.reset();
+    pub fn toggle_flight(&mut self) -> bool {
+        self.controls.toggle_flight()
+    }
+
+    pub fn flying(&self) -> bool {
+        self.controls.flight.is_some()
+    }
+
+    pub fn reset_camera(&mut self) {
+        self.controls.reset();
     }
 
     pub fn pointer_down(&mut self, down: bool) {
-        self.orbit.dragging = down;
+        self.controls.dragging = down;
     }
 
     pub fn dragging(&self) -> bool {
-        self.orbit.dragging
+        self.controls.dragging
     }
 
     /// One frame. Matches `GalaxySimulation::update`: dt clamped to 0.033, two substeps.
     pub fn step(&mut self, dt: f32) {
+        self.controls.smooth(dt);
         let dt = dt.min(0.033);
-        self.orbit.smooth(dt);
         if self.cpu {
             self.sim.update(dt);
             self.upload_cpu();
@@ -958,14 +1019,12 @@ impl GalaxyApp {
     }
 
     fn write_views(&self) {
-        let (vx, vy, vz) = self.orbit.eye();
-        let mut cam = QuaternionCamera::new(vx, vy, vz);
-        cam.look_at(0.0, 4.0, 0.0);
+        let cam = self.controls.camera();
         let view = cam.view_matrix();
         let proj = FluxQuaternion::perspective_matrix(
             std::f32::consts::FRAC_PI_4,
             self.size.0 as f32 / self.size.1 as f32,
-            2.0,
+            0.1,
             8000.0,
         );
         let pattern = self.sim.pattern_angle();
@@ -973,7 +1032,7 @@ impl GalaxyApp {
         let base = ViewUniforms {
             view,
             proj,
-            cam_pos: [vx, vy, vz, 1.0],
+            cam_pos: [cam.pos_x, cam.pos_y, cam.pos_z, 1.0],
             viewport: [self.size.0 as f32, self.size.1 as f32, pattern, 0.0],
             extra: [
                 (90_000.0 / n).clamp(0.02, 1.6),
@@ -1375,6 +1434,101 @@ mod tests {
         assert!(
             d < rel,
             "{name}: gpu {gpu:.4} cpu {cpu:.4} relative {d:.3} (limit {rel})"
+        );
+    }
+
+    #[test]
+    fn flight_switch_preserves_the_orbit_view() {
+        let mut controls = CameraControls::new();
+        controls.drag(120.0, 40.0);
+        controls.smooth(0.2);
+        let orbit_view = controls.camera().view_matrix();
+        assert!(controls.toggle_flight());
+        assert_eq!(controls.camera().view_matrix(), orbit_view);
+        controls.keys(1.0, 1.0, 0.0, 1.0);
+        controls.smooth(1.0);
+        controls.drag(100.0, -40.0);
+        assert_ne!(controls.camera().view_matrix(), orbit_view);
+        assert!(!controls.toggle_flight());
+        assert_eq!(controls.camera().view_matrix(), orbit_view);
+    }
+
+    #[test]
+    fn stalled_frames_do_not_teleport_the_flight_camera() {
+        let mut controls = CameraControls::new();
+        controls.toggle_flight();
+        let mut expected = controls.camera();
+        expected.fly(0.25, 0.0, 0.0, 1.0);
+        controls.keys(5.0, 0.0, 0.0, 1.0);
+        assert_eq!(controls.camera().view_matrix(), expected.view_matrix());
+    }
+
+    #[test]
+    fn orbit_zoom_is_reversible_and_handles_large_scrolls() {
+        let mut controls = CameraControls::new();
+        let start = controls.dist_t;
+        controls.zoom(3.0);
+        controls.zoom(-3.0);
+        assert!((controls.dist_t - start).abs() < 1e-3);
+        for steps in [1e6, -1e6, f32::MAX, -f32::MAX] {
+            controls.zoom(steps);
+            assert!(controls.dist_t.is_finite());
+            assert!((240.0..=2600.0).contains(&controls.dist_t));
+        }
+    }
+
+    #[test]
+    fn orbit_keyboard_targets_are_frame_rate_independent() {
+        let mut expected = CameraControls::new();
+        expected.keys(1.0, 1.0, 1.0, 1.0);
+        for fps in [1, 5, 30, 120] {
+            let mut controls = CameraControls::new();
+            for _ in 0..fps {
+                controls.keys(1.0 / fps as f32, 1.0, 1.0, 1.0);
+            }
+            assert!((controls.yaw_t - expected.yaw_t).abs() < 1e-4);
+            assert!((controls.tilt_t - expected.tilt_t).abs() < 1e-4);
+            assert!((controls.dist_t - expected.dist_t).abs() < 0.01);
+        }
+    }
+
+    #[test]
+    fn orbit_smoothing_uses_elapsed_wall_time() {
+        for fps in [1, 5, 30, 120] {
+            let mut controls = CameraControls::new();
+            controls.drag(120.0, 40.0);
+            controls.zoom(2.0);
+            let mut expected = CameraControls::new();
+            expected.drag(120.0, 40.0);
+            expected.zoom(2.0);
+            expected.smooth(1.0);
+            for _ in 0..fps {
+                controls.smooth(1.0 / fps as f32);
+            }
+            assert!((controls.yaw - expected.yaw).abs() < 1e-4);
+            assert!((controls.tilt - expected.tilt).abs() < 1e-4);
+            assert!((controls.dist - expected.dist).abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn reset_preserves_dragging_and_camera_mode() {
+        let mut controls = CameraControls::new();
+        controls.dragging = true;
+        controls.drag(100.0, 100.0);
+        controls.reset();
+        assert!(controls.dragging);
+        assert!(controls.flight.is_none());
+        assert_eq!(controls.yaw_t, CameraControls::new().yaw_t);
+        assert!(controls.toggle_flight());
+        controls.dragging = true;
+        controls.keys(1.0, 1.0, 0.0, 1.0);
+        controls.reset();
+        assert!(controls.dragging);
+        assert!(controls.flight.is_some());
+        assert_eq!(
+            controls.camera().view_matrix(),
+            CameraControls::new().camera().view_matrix()
         );
     }
 

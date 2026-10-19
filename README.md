@@ -64,13 +64,20 @@ Color runs from a warm gold core to blue in the outer arms, brighter where the s
 
 | Input | Action |
 |---|---|
-| Left drag | Orbit yaw and tilt |
-| Scroll, `W` / `S` | Zoom |
-| `A` / `D` | Yaw |
-| `Q` / `E` | Tilt |
-| `R` | Reset the orbit |
+| `F` | Toggle orbit / free flight |
+| Left drag (orbit) | Orbit yaw and tilt |
+| Scroll, `W` / `S` (orbit) | Zoom |
+| `A` / `D` (orbit) | Yaw |
+| `Q` / `E` (orbit) | Tilt |
+| `W` / `S` (flight) | Move forward / backward along the view direction |
+| `A` / `D` (flight) | Strafe left / right |
+| `Space` / either `Shift` (flight) | Move up / down in world space |
+| Mouse (flight) | Look around; cursor is captured while focused |
+| `R` | Reset the current camera |
 | `M` | Toggle MOND |
 | `Escape` | Quit |
+
+Flight starts at the current orbit view and can move through the galaxy without the orbit's distance limit. Press `F` again to restore the saved orbit. Losing focus releases the cursor and clears held inputs. If cursor capture is unavailable, hold the left mouse button to look around.
 
 | Flag | Default | Effect |
 |---|---|---|

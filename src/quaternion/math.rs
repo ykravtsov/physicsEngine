@@ -116,8 +116,8 @@ impl FluxQuaternion {
         [
             [f / aspect, 0.0, 0.0, 0.0],
             [0.0, f, 0.0, 0.0],
-            [0.0, 0.0, (near + far) * range_inv, -1.0],
-            [0.0, 0.0, near * far * range_inv * 2.0, 0.0],
+            [0.0, 0.0, far * range_inv, -1.0],
+            [0.0, 0.0, near * far * range_inv, 0.0],
         ]
     }
 }
@@ -166,6 +166,24 @@ impl Neg for FluxQuaternion {
             x: -self.x,
             y: -self.y,
             z: -self.z,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn perspective_uses_wgpu_depth_range() {
+        for near in [0.1, 2.0] {
+            let far = 8000.0;
+            let matrix = FluxQuaternion::perspective_matrix(0.8, 16.0 / 9.0, near, far);
+            let depth = |z: f32| (matrix[2][2] * z + matrix[3][2]) / -z;
+            assert!(depth(-near).abs() < 1e-5);
+            assert!((depth(-far) - 1.0).abs() < 1e-5);
+            assert!(depth(-near * 0.5) < 0.0);
+            assert!(depth(-near * 2.0) > 0.0);
         }
     }
 }
